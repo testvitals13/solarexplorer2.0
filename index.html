@@ -1,0 +1,2044 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Solar System Explorer</title>
+<style>
+:root {
+  --bg:#04060d; --glass:rgba(11,16,30,.68);
+  --line:rgba(150,180,255,.14); --line2:rgba(150,180,255,.28);
+  --text:#e8eefc; --muted:#92a3c8; --dim:#62729a;
+  --cyan:#5eead4; --accent:#7dd3fc; --violet:#a78bfa; --pink:#f472b6;
+  --top:78px; --dock:68px; --gap:16px; --panel-w:344px; --rail-w:128px; --radius:16px;
+}
+* { box-sizing: border-box; }
+body { margin:0; overflow:hidden; background:var(--bg); color:var(--text);
+       font-family: Inter, "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+       -webkit-font-smoothing:antialiased; }
+.label { color:#fff; font-size:13px; font-weight:500; letter-spacing:.02em; text-shadow:0 0 6px #000, 0 0 2px #000; }
+.label.small { font-size:11px; color:#cbd5e1; }
+
+/* ---------- shared pieces ---------- */
+.glass { background:var(--glass); -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
+         border:1px solid var(--line); border-radius:var(--radius);
+         box-shadow:0 12px 40px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.05); }
+button, select { font:inherit; font-size:13px; color:var(--text); background:rgba(255,255,255,.06); border:1px solid var(--line);
+                 border-radius:10px; padding:8px 14px; cursor:pointer; transition:background .18s, border-color .18s, box-shadow .18s, transform .1s; }
+button:hover, select:hover { background:rgba(255,255,255,.11); border-color:var(--line2); }
+button:active { transform:scale(.97); }
+button:focus-visible, select:focus-visible, input:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+button:disabled { opacity:.5; cursor:default; }
+select { appearance:none; -webkit-appearance:none; padding-right:30px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2392a3c8' stroke-width='1.6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 11px center; }
+select option { background:#0b101e; color:var(--text); }
+.btn-primary { background:linear-gradient(135deg,#7dd3fc,#5eead4); color:#04101a; border-color:transparent; font-weight:600; }
+.btn-primary:hover { background:linear-gradient(135deg,#9bdcfd,#7ef0df); box-shadow:0 0 22px rgba(94,234,212,.35); }
+.iconbtn { width:36px; height:36px; padding:0; display:grid; place-items:center; border-radius:11px; }
+.iconbtn svg, .pill svg { width:16px; height:16px; }
+input[type=range] { -webkit-appearance:none; appearance:none; height:4px; border-radius:4px; background:rgba(255,255,255,.14); outline:none; cursor:pointer; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:16px; height:16px; border-radius:50%;
+  background:radial-gradient(circle at 35% 35%,#fff,#7dd3fc 60%); box-shadow:0 0 0 4px rgba(125,211,252,.18), 0 0 14px rgba(125,211,252,.6); border:0; }
+input[type=range]::-moz-range-thumb { width:16px; height:16px; border-radius:50%; background:#7dd3fc; border:0; box-shadow:0 0 12px rgba(125,211,252,.6); }
+::-webkit-scrollbar { width:6px; height:6px; } ::-webkit-scrollbar-thumb { background:rgba(150,180,255,.25); border-radius:6px; }
+
+/* ---------- top bar ---------- */
+#topbar { position:fixed; top:14px; left:16px; right:16px; height:48px; z-index:20; display:flex; align-items:center; gap:14px; padding:0 8px 0 18px; }
+.brand { display:flex; align-items:center; gap:10px; font-weight:600; font-size:12px; letter-spacing:.18em; text-transform:uppercase; white-space:nowrap; }
+.brand i { width:11px; height:11px; border-radius:50%; background:radial-gradient(circle at 35% 35%,#fff,#7dd3fc 45%,#2563eb); box-shadow:0 0 14px #7dd3fc; }
+.brand small { color:var(--muted); font-weight:500; letter-spacing:.14em; }
+.sp { flex:1; }
+.toggles { display:flex; gap:4px; padding:4px; background:rgba(255,255,255,.04); border-radius:13px; border:1px solid var(--line); }
+.pill { position:relative; cursor:pointer; user-select:none; }
+.pill input { position:absolute; opacity:0; pointer-events:none; }
+.pill span { display:flex; align-items:center; gap:8px; padding:7px 14px; border-radius:10px; font-size:13px; color:var(--muted); transition:.18s; white-space:nowrap; }
+.pill:hover span { color:var(--text); background:rgba(255,255,255,.06); }
+.pill input:checked + span { color:#04101a; font-weight:600; background:linear-gradient(135deg,#7dd3fc,#5eead4); box-shadow:0 0 18px rgba(94,234,212,.35); }
+.pill input:focus-visible + span { outline:2px solid var(--accent); }
+.tright { display:flex; align-items:center; gap:8px; }
+#music { display:flex; align-items:center; gap:8px; padding-left:4px; }
+#vol { width:0; opacity:0; transition:width .25s, opacity .25s; }
+#music:hover #vol, #music:focus-within #vol { width:84px; opacity:1; }
+#musicBtn .eq { display:flex; align-items:flex-end; gap:2px; height:14px; }
+#musicBtn .eq b { width:3px; height:4px; border-radius:2px; background:currentColor; }
+#musicBtn.playing .eq b { animation:eq 1s ease-in-out infinite; }
+#musicBtn.playing .eq b:nth-child(2) { animation-delay:.2s; } #musicBtn.playing .eq b:nth-child(3) { animation-delay:.4s; } #musicBtn.playing .eq b:nth-child(4) { animation-delay:.6s; }
+#musicBtn.playing { color:var(--cyan); border-color:rgba(94,234,212,.4); }
+@keyframes eq { 0%,100% { height:3px; } 50% { height:14px; } }
+#assistBtn { display:flex; align-items:center; gap:8px; padding:8px 16px; height:36px; }
+#assistBtn svg { width:15px; height:15px; }
+#help { position:fixed; top:70px; right:16px; width:280px; padding:14px 16px; z-index:30; display:none; font-size:13px; line-height:1.7; color:#c8d4ee; }
+#help.open { display:block; }
+#help h4 { margin:0 0 6px; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); font-weight:600; }
+kbd { display:inline-block; min-width:22px; padding:1px 6px; text-align:center; font:600 11px/1.6 inherit; font-family:inherit; color:var(--text); background:rgba(255,255,255,.08); border:1px solid var(--line2); border-bottom-width:2px; border-radius:6px; }
+
+/* ---------- fly hint (shows only in fly mode) ---------- */
+#fhint { position:fixed; top:74px; left:calc(var(--rail-w) + 32px); right:calc(var(--panel-w) + 32px); width:fit-content; margin:0 auto; display:none; z-index:9; padding:8px 10px; text-align:center; }
+#fhint .kc { display:inline-flex; align-items:center; gap:5px; margin:2px 7px; font-size:12px; color:var(--muted); white-space:nowrap; }
+
+/* ---------- planet list ---------- */
+#nav { position:fixed; left:16px; top:var(--top); bottom:calc(var(--dock) + var(--gap)*2); width:var(--rail-w); z-index:10;
+       display:flex; flex-direction:column; gap:2px; padding:8px; overflow-y:auto; }
+#nav button { text-align:left; padding:7px 11px; font-size:13px; background:transparent; border-color:transparent; color:var(--muted); border-radius:9px; flex:none; }
+#nav button:hover { background:rgba(255,255,255,.07); color:var(--text); }
+#nav button.active { background:rgba(125,211,252,.14); color:var(--accent); border-color:rgba(125,211,252,.3); font-weight:600; }
+
+/* ---------- right column: info / assistant tabs + hand panel ---------- */
+#side { position:fixed; top:var(--top); right:16px; bottom:calc(var(--dock) + var(--gap)*2); width:var(--panel-w); z-index:10;
+        display:flex; flex-direction:column; gap:12px; pointer-events:none; }
+#side > * { pointer-events:auto; }
+#slot { display:none; flex-direction:column; flex:1 1 auto; min-height:0; overflow:hidden; }
+body.has-info #slot, body.assist-open #slot { display:flex; }
+#tabs { display:flex; gap:4px; padding:6px; flex:none; border-bottom:1px solid var(--line); }
+.tab { flex:1; background:transparent; border-color:transparent; color:var(--muted); padding:7px 10px; font-size:12.5px; border-radius:10px; }
+.tab.on { background:rgba(125,211,252,.13); color:var(--accent); font-weight:600; }
+#info { display:none; flex:1 1 auto; min-height:0; overflow-y:auto; padding:16px 18px 18px; font-size:14px; line-height:1.55; }
+body.tab-assist #info { display:none !important; }
+#infoEmpty { display:none; flex:1; place-items:center; padding:24px; text-align:center; color:var(--muted); font-size:13px; }
+body.assist-open:not(.has-info):not(.tab-assist) #infoEmpty { display:grid; }
+#info h2 { margin:0; font-size:23px; font-weight:600; letter-spacing:.01em; }
+#info .sub { color:var(--muted); font-size:12px; margin-top:2px; }
+#info .stats { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:14px 0 12px; }
+#info .stat { padding:9px 11px; border-radius:11px; background:rgba(255,255,255,.04); border:1px solid var(--line); min-width:0; }
+#info .k { display:block; font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); }
+#info .v { display:block; font-size:13px; margin-top:3px; line-height:1.35; }
+#info .dist { font-size:12.5px; color:var(--muted); margin-bottom:10px; }
+#info .fun { margin:0 0 14px; color:#c6d2ec; font-size:13.5px; }
+#info .wcalc { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:10px 12px; border-radius:11px; background:rgba(255,255,255,.04); border:1px solid var(--line); font-size:13px; color:var(--muted); }
+#info .wcalc b { color:var(--text); }
+#info input[type=number] { width:62px; background:rgba(255,255,255,.07); color:var(--text); border:1px solid var(--line2); border-radius:8px; padding:5px 8px; font:inherit; font-size:13px; }
+#info .btnrow { display:grid; gap:8px; margin-top:14px; }
+#info .btnrow button { width:100%; padding:10px 14px; }
+
+/* ---------- assistant ---------- */
+#assist { display:none; flex:1 1 auto; min-height:0; flex-direction:column; }
+body.tab-assist #assist { display:flex; }
+.ahead { display:flex; align-items:center; gap:10px; padding:12px 14px 8px; flex:none; }
+.ahead .who { flex:1; min-width:0; }
+.ahead .who b { display:block; font-size:14px; font-weight:600; }
+.ahead .who span { font-size:11.5px; color:var(--muted); display:flex; align-items:center; gap:6px; }
+.ahead .who span::before { content:""; width:6px; height:6px; border-radius:50%; background:var(--cyan); box-shadow:0 0 8px var(--cyan); }
+.seg { display:flex; padding:3px; gap:2px; background:rgba(255,255,255,.05); border:1px solid var(--line); border-radius:11px; }
+.seg button { padding:5px 11px; font-size:12px; background:transparent; border-color:transparent; color:var(--muted); border-radius:8px; }
+.seg button.on { background:rgba(125,211,252,.16); color:var(--accent); font-weight:600; }
+#chatView { display:flex; flex-direction:column; flex:1; min-height:0; }
+body.voice #chatView { display:none; }
+#msgs { flex:1; min-height:0; overflow-y:auto; padding:6px 14px 10px; display:flex; flex-direction:column; gap:9px; }
+.msg { max-width:90%; padding:9px 12px; border-radius:14px; font-size:13.5px; line-height:1.5; white-space:pre-wrap; word-wrap:break-word; }
+.msg.user { align-self:flex-end; background:linear-gradient(135deg,#2563eb,#4f46e5); border-bottom-right-radius:4px; }
+.msg.bot { align-self:flex-start; background:rgba(255,255,255,.06); border:1px solid var(--line); border-bottom-left-radius:4px; }
+.msg.note { align-self:center; max-width:100%; text-align:center; font-size:11.5px; color:var(--muted); padding:2px 6px; }
+.typing { display:inline-flex; gap:4px; padding:3px 0; }
+.typing i { width:6px; height:6px; border-radius:50%; background:var(--muted); animation:dot 1.1s infinite; }
+.typing i:nth-child(2) { animation-delay:.18s; } .typing i:nth-child(3) { animation-delay:.36s; }
+@keyframes dot { 0%,80%,100% { opacity:.25; transform:translateY(0); } 40% { opacity:1; transform:translateY(-3px); } }
+#chips { display:flex; flex-wrap:wrap; gap:6px; padding:0 14px 10px; flex:none; }
+.chip { font-size:12px; padding:6px 11px; border-radius:999px; color:var(--muted); }
+.chip:hover { color:var(--text); }
+.composer { display:flex; gap:8px; padding:10px 12px 12px; border-top:1px solid var(--line); flex:none; }
+#chatIn { flex:1; min-width:0; background:rgba(255,255,255,.05); border:1px solid var(--line); color:var(--text); border-radius:12px; padding:10px 12px; font:inherit; font-size:13.5px; outline:none; }
+#chatIn::placeholder { color:var(--dim); }
+#chatIn:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(125,211,252,.12); }
+.composer .iconbtn { flex:none; width:40px; height:40px; }
+#voiceView { display:none; flex:1; min-height:0; overflow:hidden; flex-direction:column; align-items:center; justify-content:center; gap:6px; padding:6px 16px 14px; text-align:center; }
+body.voice #voiceView { display:flex; }
+#orb { flex:0 1 224px; min-height:90px; width:auto; max-width:100%; aspect-ratio:1/1; cursor:pointer; }
+#orbCap { font-size:11.5px; letter-spacing:.2em; text-transform:uppercase; color:var(--accent); min-height:16px; }
+#orbTxt { position:relative; font-size:15px; line-height:1.55; color:#c9d6f2; max-height:104px; overflow-y:auto; min-height:24px; width:100%; scroll-behavior:smooth; padding:0 4px; }
+#orbTxt.you { color:#9fb3da; font-style:italic; }
+#orbTxt.karaoke .w { color:#5b6b92; transition:color .18s, text-shadow .18s; }
+#orbTxt.karaoke .w.done { color:#dbe6ff; }
+#orbTxt.karaoke .w.cur { color:#fff; text-shadow:0 0 14px rgba(125,211,252,.95); }
+#orbTxt.karaoke .w.cut { color:#3f4a69; text-decoration:line-through; text-decoration-color:rgba(255,255,255,.12); }
+.vctl { display:flex; align-items:center; gap:14px; margin-top:2px; }
+#micToggle { width:44px; height:44px; border-radius:50%; flex:none; color:var(--cyan); border-color:rgba(94,234,212,.45); background:rgba(94,234,212,.1); }
+#micToggle svg { width:20px; height:20px; } #micToggle .slash { display:none; }
+#micToggle.off { color:#fb7185; border-color:rgba(251,113,133,.5); background:rgba(251,113,133,.12); }
+#micToggle.off .slash { display:block; }
+.vopts { display:flex; flex-direction:column; gap:4px; align-items:flex-start; }
+#voiceView.muted #orb { opacity:.42; filter:saturate(.4); }
+#voiceView.muted #orbCap { color:#fb7185; }
+.vfoot { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted); cursor:pointer; user-select:none; }
+.vfoot input { accent-color:#5eead4; }
+.vsens { cursor:default; gap:10px; }
+.seg.sm button { padding:3px 9px; font-size:11px; }
+
+/* ---------- hand-gesture panel (redesigned, same controls) ---------- */
+#gcam { display:none; position:fixed; right:calc(var(--panel-w) + 28px); bottom:calc(var(--dock) + var(--gap)*2); width:340px; z-index:10; padding:12px 12px 10px; transition:right .25s ease; }
+body:not(.has-info):not(.assist-open) #gcam { right:16px; }
+.gtop { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.gtitle { display:flex; align-items:center; gap:8px; font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--muted); font-weight:600; }
+.live { width:7px; height:7px; border-radius:50%; background:#34d399; box-shadow:0 0 10px #34d399; animation:pulse 1.6s infinite; }
+@keyframes pulse { 50% { opacity:.35; } }
+#gtoggle { width:26px; height:26px; padding:0; display:grid; place-items:center; border-radius:8px; font-size:11px; }
+.gbody { display:grid; grid-template-columns:148px 1fr; gap:12px; align-items:start; }
+#gwrap { position:relative; width:100%; min-height:96px; transform:scaleX(-1); background:#05070d; border-radius:11px; overflow:hidden; border:1px solid var(--line); }
+#gwrap video, #gwrap canvas { width:100%; display:block; }
+#gwrap canvas { position:absolute; left:0; top:0; }
+.gstate { display:flex; flex-direction:column; gap:9px; min-width:0; align-items:stretch; }
+#gname { font-size:12.5px; font-weight:600; letter-spacing:.07em; padding:7px 10px; border-radius:10px; background:rgba(255,255,255,.05); border:1px solid var(--line); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#gbarwrap { height:4px; background:rgba(255,255,255,.1); border-radius:4px; overflow:hidden; }
+#gbar { height:100%; width:0; background:linear-gradient(90deg,#34d399,#5eead4); border-radius:4px; }
+#gjoy { width:78px; height:78px; align-self:center; }
+.gchips { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:10px; }
+.gchip { display:flex; align-items:center; gap:9px; padding:7px 9px; border-radius:11px; background:rgba(255,255,255,.035); border:1px solid var(--line); color:var(--muted); font-size:11px; line-height:1.3; transition:.2s; min-width:0; }
+.gchip .gi { font-size:18px; width:22px; text-align:center; flex:none; }
+.gchip b { display:block; color:var(--text); font-size:12px; font-weight:600; }
+.gchip.on { border-color:rgba(94,234,212,.65); background:rgba(94,234,212,.11); box-shadow:0 0 16px rgba(94,234,212,.16); }
+#gadv { margin-top:8px; }
+#gadv summary { cursor:pointer; font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); list-style:none; }
+#gadv summary::-webkit-details-marker { display:none; }
+#gdbg { color:#6b7a9c; font:10.5px/1.5 ui-monospace, Consolas, monospace; margin-top:6px; word-break:break-all; }
+#gsrc { color:#6b7a9c; font-size:10.5px; margin-top:4px; }
+#gcam.min .gchips, #gcam.min #gadv { display:none; }
+#gcursor { position:fixed; width:34px; height:34px; margin:-19px 0 0 -19px; border:2px solid rgba(244,114,182,.95); border-radius:50%;
+           pointer-events:none; display:none; z-index:12; box-sizing:content-box; box-shadow:0 0 16px rgba(244,114,182,.55), inset 0 0 10px rgba(244,114,182,.25); }
+#gcursor.pinch { border-color:rgba(52,211,153,.95); box-shadow:0 0 16px rgba(52,211,153,.55), inset 0 0 10px rgba(52,211,153,.25); }
+#gcursor span { position:absolute; left:46px; top:5px; color:#fff; font-size:12px; font-weight:500; white-space:nowrap; padding:3px 10px; border-radius:999px; background:rgba(5,8,16,.82); border:1px solid rgba(255,255,255,.16); }
+#gcursor span:empty { display:none; }
+
+/* ---------- bottom dock ---------- */
+#ui { position:fixed; left:16px; right:16px; bottom:16px; height:var(--dock); z-index:10; display:flex; align-items:center; gap:18px; padding:0 18px; }
+#date { flex:0 0 auto; min-width:236px; font-size:13px; font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--text); letter-spacing:.01em; }
+#slider { flex:1; min-width:120px; }
+#row { display:contents; }
+.dcontrols { display:flex; align-items:center; gap:8px; flex:none; }
+#play { min-width:98px; }
+
+/* ---------- toast ---------- */
+#toast { position:fixed; left:calc(var(--rail-w) + 32px); bottom:calc(var(--dock) + var(--gap)*2 + 6px); z-index:15; padding:9px 16px; font-size:12.5px; color:var(--muted);
+         opacity:0; pointer-events:none; transition:opacity .4s; border-radius:999px; }
+#toast.show { opacity:1; }
+
+/* ---------- 360 surface viewer ---------- */
+#surface { position:fixed; inset:0; z-index:50; background:#000; display:none; }
+#surface.open { display:block; }
+#sfc { position:absolute; inset:0; width:100%; height:100%; cursor:grab; touch-action:none; }
+#sfc.drag { cursor:grabbing; }
+.sf-top { position:absolute; left:16px; top:14px; display:flex; align-items:center; gap:14px; padding:8px 18px 8px 8px; max-width:calc(100vw - 340px); }
+.sf-top .ttl { min-width:0; }
+.sf-top b { display:block; font-size:15px; font-weight:600; }
+.sf-top span { display:block; font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sf-help { position:absolute; right:16px; top:14px; padding:10px 16px; font-size:12px; color:var(--muted); line-height:1.7; }
+.sf-strip { position:absolute; left:16px; right:16px; bottom:16px; display:flex; gap:10px; padding:10px; overflow-x:auto; }
+.sf-thumb { position:relative; flex:none; width:150px; height:84px; border-radius:11px; overflow:hidden; cursor:pointer; background:linear-gradient(135deg,#1b2440,#0b101e) center/cover; border:2px solid transparent; padding:0; text-align:left; }
+.sf-thumb:hover { border-color:var(--line2); }
+.sf-thumb.on { border-color:var(--accent); box-shadow:0 0 18px rgba(125,211,252,.35); }
+.sf-thumb em { position:absolute; left:0; right:0; bottom:0; padding:14px 8px 5px; font-style:normal; font-size:10.5px; line-height:1.25; color:#fff; background:linear-gradient(transparent,rgba(0,0,0,.85)); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+#sfLoading { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); padding:16px 24px; font-size:13.5px; color:var(--text); text-align:center; display:none; max-width:420px; }
+#sfLoading.show { display:block; }
+#sfLoading .spin { display:inline-block; width:14px; height:14px; margin-right:10px; vertical-align:-2px; border:2px solid rgba(255,255,255,.2); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+@media (max-width:1180px) { :root { --panel-w:306px; --rail-w:112px; } .gbody { grid-template-columns:128px 1fr; } .toggles .pill span { padding:7px 10px; } .brand small { display:none; } }
+@media (max-height:760px) { #orb { flex-basis:190px; } .gchip { padding:5px 8px; } .gchip .gi { display:none; } }
+</style>
+<script>
+(function () {
+  var files = ['three.module.js', 'addons/controls/OrbitControls.js', 'addons/renderers/CSS2DRenderer.js'], local = true;
+  try {
+    for (var i = 0; i < files.length; i++) {
+      var x = new XMLHttpRequest();
+      x.open('HEAD', '/static/vendor/three/' + files[i], false); x.send();
+      if (x.status !== 200) local = false;
+    }
+  } catch (e) { local = false; }
+  var map = local
+    ? { imports: { 'three': '/static/vendor/three/three.module.js', 'three/addons/': '/static/vendor/three/addons/' } }
+    : { imports: { 'three': 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js',
+                   'three/addons/': 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/' } };
+  document.write('<script type="importmap">' + JSON.stringify(map) + '<\/script>');
+})();
+</script>
+</head>
+<body>
+<!-- ===== top bar ===== -->
+<header id="topbar" class="glass">
+  <div class="brand"><i></i>Solar System <small>Explorer</small></div>
+  <div class="sp"></div>
+  <div class="toggles">
+    <label class="pill"><input type="checkbox" id="tOrbits" checked><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="12" rx="10" ry="4.5" transform="rotate(-25 12 12)"/><circle cx="12" cy="12" r="2.4" fill="currentColor"/></svg>Orbits</span></label>
+    <label class="pill"><input type="checkbox" id="tBelts" checked><span><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="4" cy="14" r="1.6"/><circle cx="9" cy="8" r="1.3"/><circle cx="13" cy="16" r="1.7"/><circle cx="17" cy="9" r="1.4"/><circle cx="21" cy="14" r="1.2"/><circle cx="7" cy="18" r="1"/></svg>Belts</span></label>
+    <label class="pill"><input type="checkbox" id="tGest"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V6.5a1.5 1.5 0 013 0V12m0-5.5a1.5 1.5 0 013 0V12m0-4a1.5 1.5 0 013 0v6c0 4-2.5 6.5-6 6.5S7 18.5 5.6 16L4.3 13.3a1.4 1.4 0 012.3-1.5L8 13"/></svg>Hand gestures</span></label>
+    <label class="pill"><input type="checkbox" id="tFly"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 11l18-8-8 18-2-8-8-2z"/></svg>Fly <kbd>F</kbd></span></label>
+  </div>
+  <div class="sp"></div>
+  <div class="tright">
+    <div id="music">
+      <input id="vol" type="range" min="0" max="100" value="55" aria-label="Music volume">
+      <button id="musicBtn" class="iconbtn" title="Interstellar theme (music on/off)" aria-label="Music"><span class="eq"><b></b><b></b><b></b><b></b></span></button>
+    </div>
+    <button id="helpBtn" class="iconbtn" title="Controls" aria-label="Controls">?</button>
+    <button id="assistBtn" class="btn-primary"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l1.9 5.6 5.6 1.9-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>Assistant</button>
+  </div>
+</header>
+<div id="help" class="glass">
+  <h4>Mouse &amp; keyboard</h4>
+  <div><kbd>Drag</kbd> rotate &nbsp; <kbd>Scroll</kbd> zoom</div>
+  <div><kbd>Click</kbd> a planet, or pick it from the list</div>
+  <div><kbd>F</kbd> fly mode &nbsp; <kbd>Esc</kbd> leave surface view</div>
+</div>
+<div id="fhint" class="glass">
+  <span class="kc"><kbd>W</kbd><kbd>S</kbd> forward / back</span><span class="kc"><kbd>A</kbd><kbd>D</kbd> sideways</span><span class="kc"><kbd>Q</kbd><kbd>E</kbd> down / up</span><span class="kc"><kbd>Arrows</kbd> or drag: look</span><span class="kc"><kbd>Scroll</kbd> jump</span><span class="kc"><kbd>Shift</kbd> faster</span>
+</div>
+
+<!-- ===== planet list ===== -->
+<div id="nav" class="glass"></div>
+
+<!-- ===== hand cursor ===== -->
+<div id="gcursor"><span id="gcurLabel"></span></div>
+
+<!-- ===== right column ===== -->
+<aside id="side">
+  <section id="slot" class="glass">
+    <div id="tabs"><button class="tab on" id="tabInfo">Planet info</button><button class="tab" id="tabAssist">Assistant</button></div>
+    <div id="infoEmpty">Pick a planet from the list, or ask the assistant to take you somewhere.</div>
+    <div id="info"></div>
+    <div id="assist">
+      <div class="ahead">
+        <div class="who"><b>Space guide</b><span id="astate">Online · needs internet</span></div>
+        <div class="seg"><button id="mText" class="on">Text</button><button id="mVoice">Voice</button></div>
+        <button id="aClose" class="iconbtn" style="width:30px;height:30px" title="Close assistant" aria-label="Close assistant">&#10005;</button>
+      </div>
+      <div id="chatView">
+        <div id="msgs"></div>
+        <div id="chips">
+          <button class="chip" data-q="Take me to Mars">Take me to Mars</button>
+          <button class="chip" data-q="Show me the surface of Mars in 360">Mars surface 360&deg;</button>
+          <button class="chip" data-q="Why is Venus so hot?">Why is Venus so hot?</button>
+          <button class="chip" data-q="Which planet has the longest day?">Longest day?</button>
+          <button class="chip" data-q="Go to Saturn and explain its rings in detail">Saturn's rings, in detail</button>
+          <button class="chip" data-q="Jump to 1986, set the speed to fast and play">Halley 1986, play fast</button>
+        </div>
+        <div class="composer">
+          <input id="chatIn" type="text" maxlength="400" placeholder="Ask about space, or say where to fly&hellip;" autocomplete="off">
+          <button id="micBtn" class="iconbtn" title="Talk instead" aria-label="Voice mode"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg></button>
+          <button id="sendBtn" class="iconbtn btn-primary" title="Send" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+        </div>
+      </div>
+      <div id="voiceView">
+        <canvas id="orb" width="460" height="460" title="Tap to talk"></canvas>
+        <div id="orbCap">Tap the orb to talk</div>
+        <div id="orbTxt"></div>
+        <div class="vctl">
+          <button id="micToggle" class="iconbtn" aria-pressed="true" title="Microphone is on (click to mute)" aria-label="Microphone on or off">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/><path class="slash" d="M4 4l16 16"/></svg>
+          </button>
+          <div class="vopts">
+            <label class="vfoot"><input type="checkbox" id="bargeIn" checked> Interrupt by talking</label>
+            <label class="vfoot"><input type="checkbox" id="keepListen"> Keep listening after answers</label>
+            <div class="vfoot vsens" title="How easily your voice stops the assistant. Use High if it still does not hear you (for example with speakers and no headphones)">Interrupt sensitivity
+              <div class="seg sm" id="bargeSens"><button data-s="low">Low</button><button data-s="normal" class="on">Normal</button><button data-s="high">High</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</aside>
+
+<!-- ===== hand-gesture panel: same ids and controls, new layout ===== -->
+  <div id="gcam" class="glass">
+    <div class="gtop">
+      <div class="gtitle"><span class="live"></span>Hand control</div>
+      <button id="gtoggle" title="Collapse / expand" aria-label="Collapse panel">&#9662;</button>
+    </div>
+    <div class="gbody">
+      <div id="gwrap"><video id="gvid" playsinline muted></video><canvas id="gcv"></canvas></div>
+      <div class="gstate">
+        <div id="gname">Starting camera...</div>
+        <div id="gbarwrap"><div id="gbar"></div></div>
+        <canvas id="gjoy" width="84" height="84"></canvas>
+      </div>
+    </div>
+    <div class="gchips" id="glegend">
+      <div class="gchip" id="chipOpen" title="Open hand: steer. Move your hand away from where you raised it, like a joystick"><span class="gi">&#9995;</span><span><b>Steer</b>open hand, like a joystick</span></div>
+      <div class="gchip" id="chipV" title="V sign: zoom / fly. Hand up = forward, down = back"><span class="gi">&#9996;</span><span><b>Zoom / fly</b>hand up = forward</span></div>
+      <div class="gchip" id="chipPoint" title="One finger: pink circle. Hold it on a planet, or pinch, to select"><span class="gi">&#9757;</span><span><b>Select</b>hold or pinch on a planet</span></div>
+      <div class="gchip" id="chipFist" title="Fist (hold): play / pause"><span class="gi">&#9994;</span><span><b>Play / pause</b>hold a fist</span></div>
+    </div>
+    <details id="gadv"><summary>Advanced info</summary><div id="gdbg"></div><div id="gsrc"></div></details>
+  </div>
+
+<!-- ===== bottom dock ===== -->
+<div id="ui" class="glass">
+  <div id="row">
+    <div id="date">Loading...</div>
+    <input id="slider" type="range" min="-25000" max="18000" value="0" aria-label="Date">
+    <div class="dcontrols">
+      <select id="speed" aria-label="Speed">
+        <option value="1">Slow</option>
+        <option value="5" selected>Medium</option>
+        <option value="20">Fast</option>
+        <option value="90">Very fast</option>
+      </select>
+      <button id="play" class="btn-primary">&#9654; Play</button>
+      <button id="reset">Whole system</button>
+    </div>
+  </div>
+</div>
+<div id="toast" class="glass"></div>
+
+<!-- ===== 360 surface viewer ===== -->
+<div id="surface">
+  <canvas id="sfc"></canvas>
+  <div class="sf-top glass"><button id="sfClose">&larr; Back to orbit</button><div class="ttl"><b id="sfTitle"></b><span id="sfSub"></span></div></div>
+  <div class="sf-help glass">Drag to look around<br>Scroll to zoom &middot; <kbd>Esc</kbd> to exit<br><span id="sfMeta" style="color:var(--dim)"></span></div>
+  <div id="sfLoading" class="glass"></div>
+  <div class="sf-strip glass" id="sfStrip"></div>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+const AU = 30;   // display units per AU. Must match server.py (linear scale = true proportions)
+const NAV = ['Sun', 'Mercury', 'Venus', 'Earth', 'Moon', 'Mars', 'Ceres', 'Jupiter', 'Saturn',
+             'Titan', 'Uranus', 'Neptune', 'Pluto', 'Haumea', 'Makemake', 'Eris', 'Halley'];
+const INNER = ['Mercury', 'Venus', 'Earth', 'Mars', 'Ceres'];   // crowded: label only when you are close
+
+// Optional textures: put these files in ~/solar/static/textures/
+const best = n => ['4k_', '2k_'].map(p => p + n);   // use the sharpest file that exists
+const TEX = { Mercury: best('mercury.jpg'), Venus: best('venus_surface.jpg'), Earth: best('earth_daymap.jpg'),
+  Moon: best('moon.jpg'), Mars: best('mars.jpg'), Jupiter: best('jupiter.jpg'), Saturn: best('saturn.jpg'),
+  Uranus: best('uranus.jpg'), Neptune: best('neptune.jpg'), Pluto: ['pluto.jpg'] };
+
+const FACTS = {
+  Sun: { diam: '1,391,000 km', day: 'About 25 days at the equator', year: '230 million years to orbit the galaxy',
+    moons: '0 (8 planets orbit it)', g: 27.9,
+    fun: 'Holds 99.86% of all the mass in the solar system. About 1.3 million Earths would fit inside it. Surface 5,500°C, core 15 million°C.' },
+  Mercury: { diam: '4,879 km', day: '59 Earth days', year: '88 days', moons: '0', g: 0.38,
+    fun: 'Almost no atmosphere, so temperatures swing from -180°C to 430°C.' },
+  Venus: { diam: '12,104 km', day: '243 Earth days', year: '225 days', moons: '0', g: 0.91,
+    fun: 'Hottest planet (about 465°C), and it spins backwards.' },
+  Earth: { diam: '12,742 km', day: '24 hours', year: '365.25 days', moons: '1', g: 1.0,
+    fun: 'The only place we know of with life.' },
+  Moon: { diam: '3,474 km', day: '27.3 days (tidally locked)', year: '27.3 days around Earth', moons: '0', g: 0.166,
+    fun: 'Always shows Earth the same face, and drifts about 3.8 cm farther away every year. Its orbit is drawn about 40x bigger than true scale so you can see it.' },
+  Mars: { diam: '6,779 km', day: '24 h 37 min', year: '687 days', moons: '2', g: 0.38,
+    fun: 'Home to Olympus Mons, the tallest volcano in the solar system.' },
+  Ceres: { diam: '939 km', day: '9.1 hours', year: '4.6 years', moons: '0', g: 0.029,
+    fun: 'The only dwarf planet in the asteroid belt. NASA\'s Dawn probe orbited it from 2015 to 2018.' },
+  Jupiter: { diam: '139,820 km', day: '9 h 56 min', year: '11.9 years', moons: '90+', g: 2.53,
+    fun: 'The Great Red Spot is a storm bigger than Earth.' },
+  Saturn: { diam: '116,460 km', day: '10 h 33 min', year: '29.5 years', moons: '140+', g: 1.07,
+    fun: 'Less dense than water. It would float in a big enough bathtub.' },
+  Uranus: { diam: '50,724 km', day: '17 h 14 min', year: '84 years', moons: '27', g: 0.89,
+    fun: 'Tilted about 98 degrees, so it rolls around the Sun on its side.' },
+  Neptune: { diam: '49,244 km', day: '16 h 6 min', year: '165 years', moons: '14', g: 1.14,
+    fun: 'Fastest winds in the solar system, over 2,000 km/h.' },
+  Pluto: { diam: '2,377 km', day: '6.4 Earth days', year: '248 years', moons: '5', g: 0.063,
+    fun: 'New Horizons flew past in July 2015. Its orbit dips inside Neptune\'s, but a 3:2 resonance keeps them apart.' },
+  Haumea: { diam: 'about 1,600 km', day: '3.9 hours', year: '283 years', moons: '2', g: 0.05,
+    fun: 'Spins so fast it is stretched into an egg shape. It also has a ring.' },
+  Makemake: { diam: '1,430 km', day: '22.8 hours', year: '306 years', moons: '1', g: 0.036,
+    fun: 'Named after the creator god of the Rapa Nui people of Easter Island, because it was found just after Easter 2005.' },
+  Eris: { diam: '2,326 km', day: 'still uncertain', year: '559 years', moons: '1', g: 0.084,
+    fun: 'About as big as Pluto but 27% more massive. Its 2005 discovery led astronomers to define "dwarf planet".' },
+  Halley: { diam: 'nucleus about 15 km long', day: 'about 2.2 days', year: '75-76 years', moons: '0', g: 0.0001,
+    fun: 'Last seen in 1986, back in 2061. Drag the slider to 1986 to watch its tail grow near the Sun.' },
+  Io: { diam: '3,643 km', day: '1.8 days', year: '1.8 days around Jupiter', moons: '0', g: 0.183,
+    fun: 'The most volcanically active place in the solar system.' },
+  Europa: { diam: '3,122 km', day: '3.6 days', year: '3.6 days around Jupiter', moons: '0', g: 0.134,
+    fun: 'Probably hides a salty ocean under its ice shell.' },
+  Ganymede: { diam: '5,268 km', day: '7.2 days', year: '7.2 days around Jupiter', moons: '0', g: 0.146,
+    fun: 'The largest moon in the solar system, bigger than Mercury.' },
+  Callisto: { diam: '4,821 km', day: '16.7 days', year: '16.7 days around Jupiter', moons: '0', g: 0.126,
+    fun: 'One of the most heavily cratered surfaces in the solar system.' },
+  Titan: { diam: '5,150 km', day: '15.9 days', year: '15.9 days around Saturn', moons: '0', g: 0.138,
+    fun: 'The only moon with a thick atmosphere, and it has lakes of liquid methane.' },
+  Triton: { diam: '2,707 km', day: '5.9 days', year: '5.9 days around Neptune', moons: '0', g: 0.08,
+    fun: 'Orbits Neptune backwards, so it was probably captured from the Kuiper Belt.' },
+  Charon: { diam: '1,212 km', day: '6.4 days', year: '6.4 days around Pluto', moons: '0', g: 0.029,
+    fun: 'So big compared to Pluto that the two circle a point in space between them.' },
+};
+
+// ---------- scene ----------
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.3, 60000);
+const HOME = new THREE.Vector3(0, 1150, 1750);
+camera.position.copy(HOME);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.setSize(innerWidth, innerHeight);
+labelRenderer.domElement.style.position = 'absolute';
+labelRenderer.domElement.style.top = '0';
+labelRenderer.domElement.style.zIndex = '1';          // keeps the 3D name labels underneath the UI panels
+labelRenderer.domElement.style.pointerEvents = 'none';
+document.body.appendChild(labelRenderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.minDistance = 0.5;
+controls.maxDistance = 14000;
+controls.zoomSpeed = 5;      // bigger number = faster zoom
+controls.rotateSpeed = 0.9;
+
+const loader = new THREE.TextureLoader();
+function tryTexture(file, apply) {
+  const list = Array.isArray(file) ? file : [file];   // a list = try the best picture first
+  const go = i => {
+    if (i >= list.length) return;
+    loader.load('/static/textures/' + list[i], t => {
+      t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      console.log('texture loaded:', list[i]);
+      apply(t);
+    }, undefined, () => go(i + 1));
+  };
+  go(0);
+}
+
+const tOrbits = document.getElementById('tOrbits');
+const tBelts = document.getElementById('tBelts');
+const info = document.getElementById('info');
+const bodies = {}, hits = [], lastAu = {};
+const lastFocus = new THREE.Vector3();
+let selected = null, focus = null, flyFrames = 0;
+
+// Stars
+const starPos = [];
+for (let i = 0; i < 5000; i++) {
+  const v = new THREE.Vector3().randomDirection().multiplyScalar(30000);
+  starPos.push(v.x, v.y, v.z);
+}
+const starGeo = new THREE.BufferGeometry();
+starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3));
+scene.add(new THREE.Points(starGeo,
+  new THREE.PointsMaterial({ color: 0xffffff, size: 1.6, sizeAttenuation: false })));
+tryTexture(['4k_stars_milky_way.jpg', '2k_stars_milky_way.jpg'], t => {
+  t.colorSpace = THREE.SRGBColorSpace;
+  scene.add(new THREE.Mesh(new THREE.SphereGeometry(40000, 48, 48),
+    new THREE.MeshBasicMaterial({ map: t, color: 0xb0b0c0, side: THREE.BackSide })));
+});
+
+scene.add(new THREE.PointLight(0xffffff, 3, 0, 0));
+scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+
+// ---------- every body gets a label, a far-away marker dot and an invisible click target ----------
+function decorate(m, b) {
+  m.userData = { name: b.name, radius: b.radius, kind: b.kind };
+  const div = document.createElement('div');
+  div.className = 'label' + (b.kind === 'moon' ? ' small' : '');
+  div.textContent = b.name;
+  const label = new CSS2DObject(div);
+  label.position.set(0, b.radius + 1.2, 0);
+  m.add(label);
+  m.userData.label = label;
+  m.userData.range = b.kind === 'moon' ? 40 : (INNER.includes(b.name) ? 450 : 1e9);
+  if (b.kind !== 'moon') {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0], 3));
+    const dot = new THREE.Points(g,
+      new THREE.PointsMaterial({ color: b.color, size: 6, sizeAttenuation: false }));
+    dot.frustumCulled = false;
+    m.add(dot);
+    m.userData.dot = dot;
+  }
+  const base = Math.max(b.radius * 2.2, b.kind === 'moon' ? 0.9 : 2.5);
+  const hit = new THREE.Mesh(new THREE.SphereGeometry(base, 12, 12),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }));
+  hit.userData.planet = b.name;
+  hit.userData.base = base;
+  m.add(hit);
+  m.userData.hit = hit;
+  hits.push(hit);
+  bodies[b.name] = m;
+}
+
+// Sun with glow
+const sun = new THREE.Mesh(new THREE.SphereGeometry(4, 48, 48),
+                           new THREE.MeshBasicMaterial({ color: 0xffc933 }));
+scene.add(sun);
+tryTexture(['4k_sun.jpg', '2k_sun.jpg'], t => {
+  t.colorSpace = THREE.SRGBColorSpace;
+  sun.material.map = t; sun.material.color.set(0xffffff); sun.material.needsUpdate = true;
+});
+function glowTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  gr.addColorStop(0, 'rgba(255,200,80,1)');
+  gr.addColorStop(0.3, 'rgba(255,160,40,0.45)');
+  gr.addColorStop(1, 'rgba(255,120,0,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(c);
+}
+const glow = new THREE.Sprite(new THREE.SpriteMaterial({
+  map: glowTexture(), blending: THREE.AdditiveBlending, depthWrite: false }));
+glow.scale.set(26, 26, 1);
+sun.add(glow);
+const corona = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xff9a3c,
+  blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.5 }));
+corona.scale.set(70, 70, 1); sun.add(corona);
+tryTexture(['4k_sun.jpg', '2k_sun.jpg'], t => {
+  t.colorSpace = THREE.SRGBColorSpace;
+  sunShell = new THREE.Mesh(new THREE.SphereGeometry(4.06, 64, 64), new THREE.MeshBasicMaterial({
+    map: t, color: 0xff8a30, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
+  sunShell.rotation.x = 0.6; sun.add(sunShell);
+});
+decorate(sun, { name: 'Sun', radius: 4, kind: 'star', color: '#ffc933' });
+lastAu.Sun = 0;
+
+// ---------- orbit lines (from the server) ----------
+const ORBIT_COLOR = { planet: 0x6b7280, dwarf: 0x8b7fb8, comet: 0x5eead4 };
+const orbitLines = [];
+fetch('/api/orbits').then(r => r.json()).then(o => {
+  for (const v of Object.values(o)) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(v.pts.flat()), 3));
+    const line = new THREE.LineLoop(g, new THREE.LineBasicMaterial(
+      { color: ORBIT_COLOR[v.kind] || 0x6b7280, transparent: true, opacity: 0.45 }));
+    line.visible = tOrbits.checked;
+    scene.add(line);
+    orbitLines.push(line);
+  }
+});
+tOrbits.onchange = () => orbitLines.forEach(l => { l.visible = tOrbits.checked; });
+
+// ---------- asteroid belt, Jupiter's Trojans, Kuiper belt ----------
+const BELT_STYLE = { main: 0xb9b2a5, trojans: 0x9fc5ff, kuiper: 0x7aa7d9 };
+const belts = {};
+function updateBelt(key, flat) {
+  let p = belts[key];
+  if (!p) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(flat.length), 3));
+    p = new THREE.Points(g, new THREE.PointsMaterial({ color: BELT_STYLE[key], size: 1.8,
+      sizeAttenuation: false, transparent: true, opacity: 0.85 }));
+    p.frustumCulled = false;
+    p.visible = tBelts.checked;
+    scene.add(p);
+    belts[key] = p;
+  }
+  p.geometry.attributes.position.array.set(flat);
+  p.geometry.attributes.position.needsUpdate = true;
+}
+tBelts.onchange = () => Object.values(belts).forEach(p => { p.visible = tBelts.checked; });
+
+// ---------- Halley's tail (points away from the Sun, grows near it) ----------
+const tail = new THREE.Mesh(new THREE.ConeGeometry(0.7, 1, 16, 1, true),
+  new THREE.MeshBasicMaterial({ color: 0xaee9ff, transparent: true, opacity: 0.35,
+                                side: THREE.DoubleSide, depthWrite: false }));
+tail.visible = false;
+scene.add(tail);
+function updateTail(p) {
+  const rAU = p.length() / AU;
+  if (rAU > 5) { tail.visible = false; return; }
+  const dir = p.clone().normalize();
+  const L = Math.min(40, 24 / (0.4 + rAU));
+  tail.visible = true;
+  tail.scale.set(1, L, 1);
+  tail.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+  tail.position.copy(p).addScaledVector(dir, L / 2);
+}
+
+// ---------- realistic extras: Saturn rings, Earth clouds / night lights / atmosphere ----------
+let earthClouds = null, sunShell = null;
+function makeRing(R) {
+  const inner = R * 1.3, outer = R * 2.3;
+  const g = new THREE.RingGeometry(inner, outer, 128, 1);
+  const p = g.attributes.position, uv = g.attributes.uv;
+  for (let i = 0; i < p.count; i++) {
+    uv.setXY(i, (Math.hypot(p.getX(i), p.getY(i)) - inner) / (outer - inner), 0.5);
+  }
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 4;
+  const ctx = c.getContext('2d'), img = ctx.createImageData(1024, 4);
+  for (let x = 0; x < 1024; x++) {
+    const rho = 1.3 + (x / 1023);                       // distance in Saturn radii
+    let a = 0;
+    if (rho < 1.53) a = 0.22;                           // C ring (faint)
+    else if (rho < 1.95) a = 0.95;                      // B ring (dense)
+    else if (rho < 2.03) a = 0.04;                      // Cassini Division (gap)
+    else if (rho < 2.27) a = rho > 2.20 && rho < 2.215 ? 0.1 : 0.7;   // A ring, Encke gap
+    a *= 0.82 + 0.18 * Math.sin(rho * 310) * Math.sin(rho * 97);
+    for (let y = 0; y < 4; y++) {
+      const k = (y * 1024 + x) * 4, s = 0.85 + 0.15 * Math.sin(rho * 220);
+      img.data[k] = 220 * s; img.data[k + 1] = 198 * s; img.data[k + 2] = 150 * s;
+      img.data[k + 3] = Math.max(0, Math.min(1, a)) * 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  return new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide,
+    transparent: true, depthWrite: false }));
+}
+function addEarthLayers(m, b) {
+  const R = b.radius;
+  tryTexture('earth_normal.jpg', t => { m.material.normalMap = t; m.material.needsUpdate = true; });
+  tryTexture('earth_specular.jpg', t => { m.material.specularMap = t; m.material.needsUpdate = true; });
+  earthClouds = new THREE.Mesh(new THREE.SphereGeometry(R * 1.012, 96, 96),
+    new THREE.MeshPhongMaterial({ color: 0xffffff, transparent: true, depthWrite: false }));
+  m.add(earthClouds);
+  tryTexture(['4k_earth_clouds.jpg', '2k_earth_clouds.jpg', 'earth_clouds.png'], t => {                 // make sure the picture has transparency
+    const sc = Math.min(1, 4096 / t.image.width), c = document.createElement('canvas');
+    c.width = Math.round(t.image.width * sc); c.height = Math.round(t.image.height * sc);
+    const x = c.getContext('2d'); x.drawImage(t.image, 0, 0, c.width, c.height);
+    const d = x.getImageData(0, 0, c.width, c.height); let minA = 255;
+    for (let i = 3; i < d.data.length; i += 4) minA = Math.min(minA, d.data[i]);
+    if (minA > 200) for (let i = 0; i < d.data.length; i += 4) { d.data[i + 3] = d.data[i]; d.data[i] = d.data[i + 1] = d.data[i + 2] = 255; }
+    x.putImageData(d, 0, 0);
+    const ct = new THREE.CanvasTexture(c); ct.colorSpace = THREE.SRGBColorSpace;
+    earthClouds.material.map = ct; earthClouds.material.needsUpdate = true;
+  });
+  const night = new THREE.Mesh(new THREE.SphereGeometry(R * 1.003, 96, 96), new THREE.ShaderMaterial({
+    uniforms: { tex: { value: null } }, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+    vertexShader: 'varying vec2 vUv; varying vec3 vN; varying vec3 vS; void main(){ vUv=uv; vN=mat3(modelMatrix)*normal; vS=-modelMatrix[3].xyz; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+    fragmentShader: 'uniform sampler2D tex; varying vec2 vUv; varying vec3 vN; varying vec3 vS; void main(){ float n=smoothstep(0.05,-0.25,dot(normalize(vN),normalize(vS))); gl_FragColor=vec4(texture2D(tex,vUv).rgb*vec3(1.0,0.82,0.5)*1.8*n,1.0); }' }));
+  m.add(night);
+  tryTexture(['4k_earth_nightmap.jpg', '2k_earth_nightmap.jpg', 'earth_lights.png'], t => { t.colorSpace = THREE.SRGBColorSpace; night.material.uniforms.tex.value = t; });
+  m.add(new THREE.Mesh(new THREE.SphereGeometry(R * 1.09, 64, 64), new THREE.ShaderMaterial({
+    transparent: true, side: THREE.BackSide, blending: THREE.AdditiveBlending, depthWrite: false,
+    vertexShader: 'varying vec3 vN; void main(){ vN=normalize(normalMatrix*normal); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+    fragmentShader: 'varying vec3 vN; void main(){ float i=clamp(pow(0.66-dot(vN,vec3(0.0,0.0,1.0)),3.0),0.0,1.0); gl_FragColor=vec4(0.3,0.6,1.0,1.0)*i*1.3; }' })));
+}
+
+// ---------- planets, dwarf planets, comet and moons ----------
+function createBody(b) {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(b.radius, 96, 96),
+    b.name === 'Earth' ? new THREE.MeshPhongMaterial({ color: b.color, shininess: 28, specular: new THREE.Color(0x444444) })
+                       : new THREE.MeshStandardMaterial({ color: b.color }));
+  if (TEX[b.name]) tryTexture(TEX[b.name], t => {
+    t.colorSpace = THREE.SRGBColorSpace;
+    m.material.map = t; m.material.color.set(0xffffff); m.material.needsUpdate = true;
+  });
+  if (b.name === 'Saturn') {
+    const ring = makeRing(b.radius);
+    ring.rotation.x = Math.PI / 2 + 0.47;
+    m.add(ring);
+  }
+  if (b.name === 'Earth') addEarthLayers(m, b);
+  decorate(m, b);
+  scene.add(m);
+}
+
+let navBuilt = false;
+function buildNav() {
+  const nav = document.getElementById('nav');
+  for (const n of NAV) {
+    if (!bodies[n]) continue;
+    const btn = document.createElement('button');
+    btn.textContent = n;
+    btn.onclick = () => select(n);
+    nav.appendChild(btn);
+  }
+  navBuilt = true;
+}
+
+async function loadBodies(dateStr) {
+  const res = await fetch('/api/planets' + (dateStr ? '?date=' + dateStr : ''));
+  const data = await res.json();
+  if (!data.bodies) return;
+  for (const b of data.bodies) {
+    if (!bodies[b.name]) createBody(b);
+    bodies[b.name].position.set(...b.pos);
+    lastAu[b.name] = b.au;
+  }
+  for (const key of Object.keys(data.belts)) updateBelt(key, data.belts[key]);
+  if (bodies.Halley) updateTail(bodies.Halley.position);
+  document.getElementById('date').textContent = 'Positions for: ' + data.date;
+  if (!navBuilt) buildNav();
+  refreshDist();
+}
+
+// ---------- pick a body: fly to it and show info ----------
+function refreshDist() {
+  const el = document.getElementById('dist');
+  if (!selected || !el) return;
+  if (selected === 'Sun') { el.textContent = 'center of the solar system'; return; }
+  const au = lastAu[selected];
+  el.textContent = au + ' AU  (sunlight takes ' + (au * 8.317).toFixed(1) + ' min)';
+}
+const SURFACE_OK = ['Mars', 'Moon', 'Venus'];
+function select(name, quiet) {
+  if (!bodies[name]) return;
+  selected = name; focus = bodies[name]; lastFocus.copy(focus.position); flyFrames = 110;
+  const f = FACTS[name] || { diam: '?', day: '?', year: '?', moons: '?', g: 0, fun: '' };
+  const canLand = SURFACE_OK.includes(name);
+  info.innerHTML =
+    '<h2>' + name + '</h2>' +
+    '<div class="sub">Surface gravity: ' + f.g + ' &times; Earth</div>' +
+    '<div class="stats">' +
+      '<div class="stat"><span class="k">Diameter</span><span class="v">' + f.diam + '</span></div>' +
+      '<div class="stat"><span class="k">Day length</span><span class="v">' + f.day + '</span></div>' +
+      '<div class="stat"><span class="k">Year</span><span class="v">' + f.year + '</span></div>' +
+      '<div class="stat"><span class="k">Moons</span><span class="v">' + f.moons + '</span></div>' +
+    '</div>' +
+    '<div class="dist"><span class="k" style="display:inline">Distance from Sun &nbsp;</span><span id="dist"></span></div>' +
+    '<p class="fun">' + f.fun + '</p>' +
+    '<div class="wcalc">If you weigh <input id="w" type="number" value="40" min="1"> kg, you would weigh <b id="wout"></b> kg here.</div>' +
+    '<div class="btnrow">' +
+      (canLand ? '<button id="surfbtn" class="btn-primary">View the surface in 360&deg;</button>' : '') +
+      '<button id="askbtn2">Ask the assistant about ' + name + '</button>' +
+    '</div>';
+  info.style.display = 'block';
+  const w = document.getElementById('w'), out = document.getElementById('wout');
+  const upd = () => { out.textContent = ((+w.value || 0) * f.g).toFixed(1); };
+  w.addEventListener('input', upd); upd();
+  refreshDist();
+  const sb = document.getElementById('surfbtn');
+  if (sb) sb.onclick = () => window.openSurface && window.openSurface(name);
+  document.getElementById('askbtn2').onclick = () => window.__ui && window.__ui.askAbout(name);
+  if (window.__ui) window.__ui.onSelect(name, !!quiet);
+}
+
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
+renderer.domElement.addEventListener('click', e => {
+  mouse.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+  ray.setFromCamera(mouse, camera);
+  const h = ray.intersectObjects(hits, false)[0];
+  if (h) select(h.object.userData.planet);
+});
+document.getElementById('reset').onclick = () => {
+  focus = null; selected = null; info.style.display = 'none';
+  controls.target.set(0, 0, 0); camera.position.copy(HOME);
+};
+
+// ---------- time slider and play button ----------
+const base = Date.UTC(2000, 0, 1);       // slider counts days since 2000-01-01
+const slider = document.getElementById('slider');
+slider.value = Math.floor((Date.now() - base) / 86400000);
+function dateFor(days) { return new Date(base + days * 86400000).toISOString().slice(0, 10); }
+let busy = false, pending = null;
+slider.addEventListener('input', async () => {
+  pending = dateFor(+slider.value);
+  if (busy) return;
+  busy = true;
+  while (pending) { const d = pending; pending = null; await loadBodies(d); }
+  busy = false;
+});
+
+let playing = false;
+const playBtn = document.getElementById('play');
+playBtn.onclick = async () => {
+  if (playing) { playing = false; playBtn.innerHTML = '&#9654; Play'; return; }
+  playing = true; playBtn.innerHTML = '&#10074;&#10074; Pause';
+  while (playing) {
+    const v = +slider.value + (+document.getElementById('speed').value);
+    if (v > +slider.max) { playing = false; playBtn.innerHTML = '&#9654; Play'; break; }
+    slider.value = v;
+    await loadBodies(dateFor(v));
+    await new Promise(r => setTimeout(r, 30));
+  }
+};
+
+loadBodies();   // no date = right now
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  labelRenderer.setSize(innerWidth, innerHeight);
+});
+
+// ---------- hand gestures + fly camera (v3: joystick steering, 3D finger angles) ----------
+const G = { turnSpeed: 1.7,      // how fast steering turns the view (radians per second at full push)
+            zoomRate: 1.8,       // how fast V-sign zoom works at full push
+            flyFactor: 0.6,      // bigger = flies faster (speed also grows with distance from planets)
+            invertTurn: false,   // set to true if steering feels backwards
+            dwellMs: 900,        // hold the pink circle on a planet this long to select it
+            pickRadius: 90 };    // how close (in pixels) the pink circle must be to a planet
+const $ = id => document.getElementById(id);
+const tGest = $('tGest'), tFly = $('tFly'), gcam = $('gcam'), gvid = $('gvid'), gcv = $('gcv'),
+      gname = $('gname'), gdbg = $('gdbg'), gcursor = $('gcursor'), gcurLabel = $('gcurLabel'),
+      fhint = $('fhint'), gbar = $('gbar'), gjoy = $('gjoy'), gsrc = $('gsrc');
+
+// BEGIN-LOADER
+// The hand-tracking files are loaded from your own folder first (works with no internet),
+// and from the internet only if the local copies are missing.
+const MP_SOURCES = [
+  { name: 'offline files', base: '/static/vendor/mediapipe', file: 'vision_bundle.js',
+    model: '/static/vendor/mediapipe/hand_landmarker.task' },
+  { name: 'internet', base: 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14', file: 'vision_bundle.mjs',
+    model: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task' },
+];
+async function loadLandmarker(sources, importFn) {
+  const errors = [];
+  for (const s of sources) {
+    try {
+      const { HandLandmarker, FilesetResolver } = await importFn(s.base + '/' + s.file);
+      const fileset = await FilesetResolver.forVisionTasks(s.base + '/wasm');
+      const make = delegate => HandLandmarker.createFromOptions(fileset, {
+        baseOptions: { delegate, modelAssetPath: s.model },
+        runningMode: 'VIDEO', numHands: 1,
+        minHandDetectionConfidence: 0.6, minHandPresenceConfidence: 0.6, minTrackingConfidence: 0.6 });
+      let landmarker;
+      try { landmarker = await make('GPU'); } catch (e) { landmarker = await make('CPU'); }
+      return { landmarker, source: s.name };
+    } catch (e) { errors.push(s.name + ': ' + ((e && e.message) || e)); }
+  }
+  throw new Error('Could not load the hand model. ' + errors.join(' | '));
+}
+// END-LOADER
+
+// BEGIN-CLASSIFY
+// Each finger is measured by how far its tip reaches from the wrist compared with its knuckle:
+// a straight finger reaches about 1.8x, a curled one about 0.75x. These are long distances, so camera
+// noise barely changes them, and they stay the same however you tilt or turn your hand (it is all in 3D).
+const FING = { index: [5, 8], middle: [9, 12], ring: [13, 16], pinky: [17, 20] };
+const fState = { index: false, middle: false, ring: false, pinky: false };
+let fHave = false, pinchState = false;
+function dist3(a, b) { return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z); }
+function resetHand() { fHave = false; pinchState = false; }
+function classify(p) {            // p = 21 points in 3D (any consistent units)
+  const hs = dist3(p[0], p[9]);
+  if (hs < 1e-6) return { pose: 'NONE', pinch: false, reach: null, pd: 0 };
+  const reach = {};
+  for (const n of Object.keys(FING)) {
+    const r = dist3(p[FING[n][1]], p[0]) / dist3(p[FING[n][0]], p[0]);
+    reach[n] = r;
+    if (!fHave) fState[n] = r > 1.30;             // first look at a new hand
+    else if (r > 1.45) fState[n] = true;          // clearly straight
+    else if (r < 1.15) fState[n] = false;         // clearly curled; in between = keep what it was
+  }
+  fHave = true;
+  const pd = dist3(p[4], p[8]) / hs;              // thumb tip to index tip, relative to hand size
+  pinchState = pd < (pinchState ? 0.40 : 0.30) && reach.index > 0.95;
+  const f = fState;
+  let pose = 'NONE';
+  if (!f.middle && !f.ring && !f.pinky) {
+    if (pinchState || f.index) pose = 'POINT';    // index finger (or a pinch): move the pink circle
+    else pose = 'FIST';
+  } else if (f.index && f.middle && f.ring && f.pinky) pose = 'OPEN';
+  else if (f.index && f.middle && !f.ring && !f.pinky) pose = 'V';
+  // every other shape (rock sign, 3 fingers, ...) is "NONE": it does nothing, so it can never mix up
+  return { pose, pinch: pinchState && pose === 'POINT', reach, pd };
+}
+
+// A mode only locks in after the same shape is held for a moment, so flicker and
+// the in-between shapes while you change your hand can never trigger anything.
+const DWELL = { OPEN: 220, V: 220, POINT: 160, FIST: 450, NONE: 140 };
+let gMode = 'NONE', gCand = 'NONE', gCandSince = 0;
+function modeReset() { gMode = 'NONE'; gCand = 'NONE'; gCandSince = 0; }
+function modeStep(pose, now) {
+  let switched = false, progress = 0;
+  if (pose === gMode) { gCand = gMode; gCandSince = now; }
+  else {
+    if (pose !== gCand) { gCand = pose; gCandSince = now; }
+    const need = DWELL[pose] || 200;
+    progress = Math.min(1, (now - gCandSince) / need);
+    if (now - gCandSince >= need) { gMode = pose; gCand = pose; gCandSince = now; switched = true; progress = 0; }
+  }
+  return { mode: gMode, switched, progress };
+}
+const JOY = { dead: 0.05, full: 0.20 };   // how far (as a fraction of the picture) you move your hand
+function joy(d) {
+  const a = Math.abs(d);
+  if (a < JOY.dead) return 0;
+  const t = Math.min(1, (a - JOY.dead) / (JOY.full - JOY.dead));
+  return Math.sign(d) * Math.pow(t, 1.5);
+}
+// END-CLASSIFY
+
+let gStream = null, gLandmarker = null, gRunning = false, gLastTime = -1, lastHandT = 0;
+let jx = 0, jy = 0;                                 // joystick: +x = hand moved to your right, +y = hand moved down
+const anchor = { x: 0.5, y: 0.5 }, pm = { x: 0.5, y: 0.5 };
+let palmInit = false, cursorSeen = false, hoverName = null, hoverSince = 0, lastPick = 0, pinchFrames = 0;
+const cur = { x: 0.5, y: 0.5 };
+const HAND_LINKS = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],
+  [9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+const MODE_TEXT = { OPEN: '✋ STEER', V: '✌ ZOOM', POINT: '☝ SELECT',
+                    FIST: '✊ PLAY / PAUSE', NONE: '— no control' };
+
+function drawHand(ctx, lm) {
+  const w = gcv.width, h = gcv.height;
+  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
+  for (const [a, b] of HAND_LINKS) {
+    ctx.beginPath(); ctx.moveTo(lm[a].x * w, lm[a].y * h); ctx.lineTo(lm[b].x * w, lm[b].y * h); ctx.stroke();
+  }
+  ctx.fillStyle = '#ef4444';
+  for (const p of lm) { ctx.beginPath(); ctx.arc(p.x * w, p.y * h, 3.5, 0, 6.2832); ctx.fill(); }
+}
+function drawJoy(active) {
+  const c = gjoy.getContext('2d'), W = gjoy.width, H = gjoy.height, R = W / 2 - 6;
+  c.clearRect(0, 0, W, H);
+  c.strokeStyle = active ? '#9ca3af' : '#4b5563'; c.lineWidth = 2;
+  c.beginPath(); c.arc(W / 2, H / 2, R, 0, 6.2832); c.stroke();
+  c.strokeStyle = '#374151'; c.lineWidth = 1;
+  c.beginPath(); c.arc(W / 2, H / 2, R * JOY.dead / JOY.full, 0, 6.2832); c.stroke();   // dead zone
+  c.beginPath(); c.moveTo(W / 2, 6); c.lineTo(W / 2, H - 6); c.moveTo(6, H / 2); c.lineTo(W - 6, H / 2); c.stroke();
+  if (active) {
+    const k = Math.max(-1, Math.min(1, (pm.x - anchor.x) / JOY.full)), l = Math.max(-1, Math.min(1, (pm.y - anchor.y) / JOY.full));
+    c.fillStyle = (jx || jy) ? '#34d399' : '#f472b6';
+    c.beginPath(); c.arc(W / 2 + k * R, H / 2 + l * R, 6, 0, 6.2832); c.fill();
+  }
+}
+
+// which planet is closest to a point on the screen?
+const _pv = new THREE.Vector3();
+function screenOf(name) {
+  const m = bodies[name];
+  if (!m) return null;
+  const u = m.userData;
+  if (!(u.label.visible || (u.dot && u.dot.visible))) return null;
+  m.getWorldPosition(_pv).project(camera);
+  if (_pv.z > 1 || _pv.z < -1) return null;
+  return { x: (_pv.x * 0.5 + 0.5) * innerWidth, y: (-_pv.y * 0.5 + 0.5) * innerHeight };
+}
+function pickAt(px, py) {
+  let best = null, bd = G.pickRadius;
+  for (const n of Object.keys(bodies)) {
+    const s = screenOf(n);
+    if (!s) continue;
+    const d = Math.hypot(s.x - px, s.y - py);
+    if (d < bd) { bd = d; best = n; }
+  }
+  return best;
+}
+
+function gLoop() {
+  if (!gRunning) return;
+  if (gvid.readyState >= 2 && gvid.currentTime !== gLastTime) {
+    gLastTime = gvid.currentTime;
+    gcv.width = gvid.videoWidth; gcv.height = gvid.videoHeight;
+    const ctx = gcv.getContext('2d'), now = performance.now();
+    let lm = null, pts = null;
+    try {
+      const res = gLandmarker.detectForVideo(gvid, now);
+      if (res.landmarks && res.landmarks.length) {
+        lm = res.landmarks[0];
+        const wl = res.worldLandmarks && res.worldLandmarks[0], asp = gvid.videoWidth / gvid.videoHeight;
+        pts = (wl && wl.length === 21) ? wl : lm.map(q => ({ x: q.x * asp, y: q.y, z: q.z * asp }));
+        drawHand(ctx, lm);
+        lastHandT = now;
+      }
+    } catch (e) { console.error(e); }
+
+    const gone = !lm && now - lastHandT > 200;       // a very short dropout keeps the current mode
+    if (gone) { resetHand(); palmInit = false; }
+    let cls = { pose: 'NONE', pinch: false, reach: null, pd: 0 };
+    if (pts) cls = classify(pts);
+    const st = modeStep(pts ? cls.pose : (gone ? 'NONE' : gMode), now);
+
+    if (lm) {                                         // smoothed palm position (mirrored, like a mirror)
+      const mx = 1 - lm[9].x, my = lm[9].y;
+      if (!palmInit) { pm.x = mx; pm.y = my; palmInit = true; }
+      else { pm.x += (mx - pm.x) * 0.45; pm.y += (my - pm.y) * 0.45; }
+    }
+    if (st.switched) {
+      if (st.mode === 'OPEN' || st.mode === 'V') { anchor.x = pm.x; anchor.y = pm.y; }   // wherever you start is "center"
+      if (st.mode === 'FIST') playBtn.click();                                          // fist = Play / Pause
+      hoverName = null; hoverSince = 0; pinchFrames = 0;
+    }
+
+    // joystick: how far your hand moved from where you started
+    jx = 0; jy = 0;
+    if (lm && (gMode === 'OPEN' || gMode === 'V') && cls.pose === gMode) {   // only on frames where the shape really matches
+      jx = joy(pm.x - anchor.x); jy = joy(pm.y - anchor.y);
+      if (gMode === 'V') jx = 0;                      // zoom only uses up / down
+    }
+
+    // pink circle (SELECT mode): follows the base of your index finger
+    if (lm && gMode === 'POINT') {
+      const tx = Math.max(0, Math.min(1, (1 - lm[5].x - 0.5) * 1.6 + 0.5));
+      const ty = Math.max(0, Math.min(1, (lm[5].y - 0.5) * 1.6 + 0.5));
+      if (!cursorSeen) { cur.x = tx; cur.y = ty; cursorSeen = true; }
+      cur.x += (tx - cur.x) * 0.35; cur.y += (ty - cur.y) * 0.35;
+      const px = cur.x * innerWidth, py = cur.y * innerHeight;
+      let cand = pickAt(px, py);
+      if (hoverName && cand !== hoverName) {          // keep the old target while the circle is still close to it
+        const s = screenOf(hoverName);
+        if (s && Math.hypot(s.x - px, s.y - py) < G.pickRadius * 1.35) cand = hoverName;
+      }
+      if (cand !== hoverName) { hoverName = cand; hoverSince = now; }
+      const prog = hoverName ? Math.max(0, Math.min(1, (now - hoverSince) / G.dwellMs)) : 0;
+      pinchFrames = cls.pinch ? pinchFrames + 1 : 0;
+      if (hoverName && now - lastPick > 1200 && (prog >= 1 || pinchFrames === 2)) {   // hold, or pinch, to select
+        lastPick = now; hoverSince = now + 1200; select(hoverName);
+      }
+      gcursor.style.display = 'block';
+      gcursor.style.left = px + 'px'; gcursor.style.top = py + 'px';
+      gcursor.style.background = prog > 0 ? 'conic-gradient(rgba(52,211,153,0.65) ' + (prog * 360) + 'deg, transparent 0)' : 'transparent';
+      gcursor.classList.toggle('pinch', cls.pinch);
+      gcurLabel.textContent = hoverName || '';
+    } else {
+      cursorSeen = false; hoverName = null;
+      gcursor.style.display = 'none';
+    }
+
+    gname.textContent = !lm ? 'Show your hand' : MODE_TEXT[gMode];
+    gbar.style.width = (st.progress * 100) + '%';
+    gdbg.textContent = cls.reach ? ('I' + (fState.index ? '+' : '-') + ' M' + (fState.middle ? '+' : '-') +
+      ' R' + (fState.ring ? '+' : '-') + ' P' + (fState.pinky ? '+' : '-') + '   reach ' +
+      cls.reach.index.toFixed(1) + '/' + cls.reach.middle.toFixed(1) + '/' + cls.reach.ring.toFixed(1) + '/' +
+      cls.reach.pinky.toFixed(1) + '   pinch ' + cls.pd.toFixed(2)) : '';
+    drawJoy(lm && (gMode === 'OPEN' || gMode === 'V'));
+  }
+  requestAnimationFrame(gLoop);
+}
+
+async function startGestures() {
+  gcam.style.display = 'block';
+  gname.textContent = 'Starting camera...';
+  try {
+    gStream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+    gvid.srcObject = gStream;
+    await gvid.play();
+    if (!gLandmarker) {
+      gname.textContent = 'Loading hand model...';
+      const r = await loadLandmarker(MP_SOURCES, u => import(u));
+      gLandmarker = r.landmarker;
+      gsrc.textContent = 'hand model loaded from: ' + r.source;
+    }
+    gRunning = true;
+    modeReset(); resetHand(); palmInit = false;
+    gname.textContent = 'Show your hand';
+    gLoop();
+  } catch (e) {
+    console.error(e);
+    stopGestures(true);
+    gname.textContent = 'Could not start: ' + (e.message || e);
+    tGest.checked = false;
+  }
+}
+function stopGestures(keepPanel) {
+  gRunning = false;
+  modeReset(); resetHand(); palmInit = false; cursorSeen = false; hoverName = null;
+  jx = 0; jy = 0;
+  gcursor.style.display = 'none';
+  if (gStream) { gStream.getTracks().forEach(t => t.stop()); gStream = null; }
+  gvid.srcObject = null;
+  if (!keepPanel) gcam.style.display = 'none';
+}
+tGest.onchange = () => { if (tGest.checked) startGestures(); else stopGestures(false); };
+
+// ---------- orbit mode: the hand joystick steers the normal camera ----------
+const _off = new THREE.Vector3(), _sph = new THREE.Spherical();
+function applyOrbit(dt) {
+  if (!gRunning || (gMode !== 'OPEN' && gMode !== 'V') || (!jx && !jy)) return;
+  _off.copy(camera.position).sub(controls.target);
+  _sph.setFromVector3(_off);
+  if (gMode === 'OPEN') {                             // hand right = scene turns right, like dragging with the mouse
+    const s = (G.invertTurn ? -1 : 1) * G.turnSpeed * dt;
+    _sph.theta -= jx * s;
+    _sph.phi = Math.max(0.05, Math.min(Math.PI - 0.05, _sph.phi - jy * s));
+  } else {                                            // V sign: hand up = zoom in, hand down = zoom out
+    const z = Math.exp(G.zoomRate * -jy * dt);
+    _sph.radius = Math.max(controls.minDistance, Math.min(controls.maxDistance, _sph.radius / z));
+  }
+  _off.setFromSpherical(_sph);
+  camera.position.copy(controls.target).add(_off);
+}
+
+// ---------- fly mode: a free camera, like a spaceship ----------
+let flyMode = false, flyYaw = 0, flyPitch = 0, flyDrag = false;
+const keys = new Set();
+const _e = new THREE.Euler(0, 0, 0, 'YXZ'), _fwd = new THREE.Vector3(),
+      _right = new THREE.Vector3(), _mv = new THREE.Vector3(), _aim = new THREE.Vector3();
+function anglesFromCamera() {
+  _e.setFromQuaternion(camera.quaternion, 'YXZ');
+  flyYaw = _e.y; flyPitch = _e.x;
+}
+function anglesToward(p) {      // the yaw and pitch that look straight at point p
+  _aim.copy(p).sub(camera.position);
+  const L = _aim.length() || 1;
+  return { yaw: Math.atan2(-_aim.x, -_aim.z), pitch: Math.asin(Math.max(-1, Math.min(1, _aim.y / L))) };
+}
+function setFlyMode(on) {
+  flyMode = on; tFly.checked = on;
+  controls.enabled = !on;
+  fhint.style.display = on ? 'block' : 'none';
+  if (on) anglesFromCamera();
+  else {
+    camera.getWorldDirection(_fwd);
+    const L = Math.max(5, Math.min(3000, camera.position.length()));
+    controls.target.copy(camera.position).addScaledVector(_fwd, L);
+    controls.update();
+  }
+}
+tFly.onchange = () => setFlyMode(tFly.checked);
+$('reset').addEventListener('click', () => {
+  if (flyMode) { const a = anglesToward(new THREE.Vector3(0, 0, 0)); flyYaw = a.yaw; flyPitch = a.pitch; }
+});
+function stopFollowing() { if (focus) { focus = null; flyFrames = 0; } }
+function nearestDist() {        // flying is slow near a planet and fast out in space
+  let m = 1e9;
+  for (const name of Object.keys(bodies)) {
+    const b = bodies[name];
+    m = Math.min(m, camera.position.distanceTo(b.position) - b.userData.radius);
+  }
+  return Math.max(0.05, m);
+}
+function applyFly(dt) {
+  let mv = 0, side = 0, up = 0, yawIn = 0, pitchIn = 0;
+  if (keys.has('w')) mv += 1;
+  if (keys.has('s')) mv -= 1;
+  if (keys.has('d')) side += 1;
+  if (keys.has('a')) side -= 1;
+  if (keys.has('e')) up += 1;
+  if (keys.has('q')) up -= 1;
+  if (keys.has('arrowleft')) yawIn += 1;
+  if (keys.has('arrowright')) yawIn -= 1;
+  if (keys.has('arrowup')) pitchIn += 1;
+  if (keys.has('arrowdown')) pitchIn -= 1;
+  if (gRunning) {
+    const s = G.invertTurn ? -1 : 1;
+    if (gMode === 'OPEN') { yawIn -= jx * s; pitchIn -= jy * s; }   // hand right = look right, hand up = look up
+    if (gMode === 'V') mv += -jy;                                     // hand up = fly forward, hand down = back
+  }
+  mv = Math.max(-1, Math.min(1, mv));
+  if (mv || side || up || yawIn || pitchIn) stopFollowing();
+  flyYaw += yawIn * G.turnSpeed * dt;
+  flyPitch = Math.max(-1.5, Math.min(1.5, flyPitch + pitchIn * G.turnSpeed * dt));
+  if (focus) {                  // flying to a selected planet: turn to face it
+    const a = anglesToward(focus.position);
+    let dy = a.yaw - flyYaw;
+    while (dy > Math.PI) dy -= 2 * Math.PI;
+    while (dy < -Math.PI) dy += 2 * Math.PI;
+    flyYaw += dy * 0.12; flyPitch += (a.pitch - flyPitch) * 0.12;
+  }
+  camera.quaternion.setFromEuler(_e.set(flyPitch, flyYaw, 0, 'YXZ'));
+  if (mv || side || up) {
+    const speed = Math.max(0.15, Math.min(1500, nearestDist() * G.flyFactor)) * (keys.has('shift') ? 4 : 1);
+    camera.getWorldDirection(_fwd);
+    _right.crossVectors(_fwd, camera.up).normalize();
+    _mv.set(0, 0, 0).addScaledVector(_fwd, mv).addScaledVector(_right, side).addScaledVector(camera.up, up);
+    camera.position.addScaledVector(_mv, speed * dt);
+  }
+}
+renderer.domElement.addEventListener('pointerdown', () => { if (flyMode) flyDrag = true; });
+addEventListener('pointerup', () => { flyDrag = false; });
+addEventListener('pointermove', e => {
+  if (!flyMode || !flyDrag) return;
+  stopFollowing();
+  flyYaw -= e.movementX * 0.004;
+  flyPitch = Math.max(-1.5, Math.min(1.5, flyPitch - e.movementY * 0.004));
+});
+renderer.domElement.addEventListener('wheel', e => {
+  if (!flyMode) return;
+  e.preventDefault();
+  stopFollowing();
+  camera.getWorldDirection(_fwd);
+  camera.position.addScaledVector(_fwd, Math.max(0.1, Math.min(800, nearestDist() * 0.2)) * -Math.sign(e.deltaY));
+}, { passive: false });
+addEventListener('keydown', e => {
+  if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
+  const k = e.key.toLowerCase();
+  if (k === 'f' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) setFlyMode(!flyMode);
+  if (flyMode) keys.add(k);
+});
+addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+addEventListener('blur', () => keys.clear());
+let lastT = performance.now();
+
+const step = new THREE.Vector3();
+function animate() {
+  requestAnimationFrame(animate);
+  if (window.__surfaceOpen) { lastT = performance.now(); return; }   // surface viewer is covering the scene
+  const nowT = performance.now(), dt = Math.min(0.1, (nowT - lastT) / 1000); lastT = nowT;
+  if (focus) {
+    step.copy(focus.position).sub(lastFocus);       // keep following the body as it moves
+    camera.position.add(step);
+    lastFocus.copy(focus.position);
+    controls.target.lerp(focus.position, 0.15);
+    if (flyFrames > 0) {
+      const r = focus.userData.radius;
+      const desired = focus.position.clone().add(new THREE.Vector3(0, r * 2 + 3, r * 5 + 12));
+      camera.position.lerp(desired, 0.06);
+      flyFrames--;
+    }
+  }
+  if (flyMode) applyFly(dt); else { applyOrbit(dt); controls.update(); }
+  if (earthClouds) earthClouds.rotation.y += 0.0004;
+  sun.rotation.y += 0.0015;
+  if (sunShell) sunShell.rotation.y -= 0.0035;
+  glow.scale.setScalar(26 + Math.sin(performance.now() * 0.002) * 1.5);
+  for (const m of Object.values(bodies)) {
+    const u = m.userData;
+    const d = camera.position.distanceTo(m.position);
+    u.label.visible = d < u.range;
+    if (u.dot) u.dot.visible = d > u.radius * 15 + 15;
+    u.hit.scale.setScalar(Math.max(1, d * 0.015 / u.hit.userData.base));   // easy to click from far away
+  }
+  renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
+}
+function tween(ms, fn) {            // runs fn(0..1) smoothly over ms milliseconds (ease-out)
+  const t0 = performance.now();
+  (function f() { const k = Math.min(1, (performance.now() - t0) / ms); fn(k * (2 - k)); if (k < 1) requestAnimationFrame(f); })();
+}
+// ---------- hooks used by the assistant, music and surface viewer (new UI layer) ----------
+window.SOLAR = {
+  select, FACTS, bodies, lastAu,
+  get selected() { return selected; },
+  get playing() { return playing; },
+  get flying() { return flyMode; },
+  setFly: setFlyMode,
+  // camera moves for the assistant: the same thing a scroll or a drag does, but smooth
+  zoom(dir) {
+    if (flyMode) {
+      stopFollowing(); camera.getWorldDirection(_fwd);
+      const dist = Math.max(0.1, Math.min(800, nearestDist() * 0.5)) * (dir === 'in' ? 1 : -1), p0 = camera.position.clone();
+      tween(450, k => camera.position.copy(p0).addScaledVector(_fwd, dist * k));
+      return;
+    }
+    flyFrames = 0;                                                         // stop the automatic approach so it does not fight the zoom
+    const off = camera.position.clone().sub(controls.target), r0 = off.length(), u = off.clone().normalize();
+    const r1 = Math.max(controls.minDistance, Math.min(controls.maxDistance, r0 * (dir === 'in' ? 0.5 : 2)));
+    tween(450, k => camera.position.copy(controls.target).addScaledVector(u, r0 + (r1 - r0) * k));
+  },
+  rotate(dir) {
+    flyFrames = 0;
+    if (flyMode) {
+      stopFollowing();
+      const y0 = flyYaw, p0 = flyPitch, dy = dir === 'left' ? 0.6 : dir === 'right' ? -0.6 : 0, dp = dir === 'up' ? 0.4 : dir === 'down' ? -0.4 : 0;
+      tween(450, k => { flyYaw = y0 + dy * k; flyPitch = Math.max(-1.5, Math.min(1.5, p0 + dp * k)); });
+      return;
+    }
+    const sph = new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target)), t0 = sph.theta, p0 = sph.phi;
+    const dth = dir === 'left' ? 0.7 : dir === 'right' ? -0.7 : 0, dph = dir === 'up' ? -0.45 : dir === 'down' ? 0.45 : 0;   // up = view from higher above
+    tween(500, k => {
+      sph.theta = t0 + dth * k; sph.phi = Math.max(0.05, Math.min(Math.PI - 0.05, p0 + dph * k));
+      camera.position.copy(controls.target).add(new THREE.Vector3().setFromSpherical(sph));
+    });
+  },
+  context() {
+    const n = selected, date = document.getElementById('date').textContent.replace('Positions for: ', '');
+    if (!n) return { selected: '', facts: '', date };
+    const f = FACTS[n] || {};
+    return { selected: n, date,
+      facts: n + ': diameter ' + f.diam + '; day length ' + f.day + '; year ' + f.year + '; moons ' + f.moons + '. ' + f.fun +
+             (n === 'Sun' ? '' : ' Distance from Sun right now: ' + lastAu[n] + ' AU.') };
+  },
+};
+
+animate();
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+const $ = id => document.getElementById(id);
+const body = document.body;
+const S = window.SOLAR;
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+};
+
+/* =============================================================== toast */
+let toastTimer = 0;
+function toast(text, ms = 4200) {
+  const t = $('toast'); t.textContent = text; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), ms);
+}
+
+/* =============================================================== tabs: planet info / assistant */
+const info = $('info');
+new MutationObserver(() => body.classList.toggle('has-info', info.style.display === 'block'))
+  .observe(info, { attributes: true, attributeFilter: ['style'] });
+
+function showTab(which) {
+  const assist = which === 'assist';
+  if (assist) body.classList.add('assist-open');
+  body.classList.toggle('tab-assist', assist);
+  $('tabInfo').classList.toggle('on', !assist);
+  $('tabAssist').classList.toggle('on', assist);
+  if (!assist && body.classList.contains('voice')) { stopListening(); stopSpeaking(); }
+  if (assist) setTimeout(() => { if (!body.classList.contains('voice')) $('chatIn').focus(); }, 60);
+  syncOrb();
+}
+function closeAssist() {
+  stopListening(); stopSpeaking(); closeMic(); setState('idle');
+  body.classList.remove('assist-open', 'tab-assist', 'voice');
+  $('mText').classList.add('on'); $('mVoice').classList.remove('on');
+  $('tabInfo').classList.add('on'); $('tabAssist').classList.remove('on');
+  syncOrb();
+}
+$('tabInfo').onclick = () => showTab('info');
+$('tabAssist').onclick = () => showTab('assist');
+$('assistBtn').onclick = () => (body.classList.contains('tab-assist') ? closeAssist() : showTab('assist'));
+$('aClose').onclick = closeAssist;
+
+window.__ui = {
+  say(t) { speak(t); },                                   // preview helper
+  debug() { return { state, micOn, sens: bargeSens, voiceLevel: +(barge.level || 0).toFixed(3), echoLevel: +barge.echo.toFixed(3), trigger: +barge.thr.toFixed(3), heldMs: Math.round(barge.acc * 1000), kar: kar ? kar.idx : null }; },
+  setOrb(st) { setState(st); },          // lets the orb be previewed in any state
+  onSelect(name, quiet) {
+    if (['Mars', 'Moon', 'Venus'].includes(name)) fetch('/api/surface/search?body=' + name).catch(() => {});   // pre-load, so the 360 view opens fast
+    document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('active', b.textContent === name));
+    if (!quiet && body.classList.contains('tab-assist')) showTab('info');
+  },
+  askAbout(name) {
+    showTab('assist'); setMode(false);
+    send('Tell me something surprising about ' + name + '.');
+  },
+};
+
+/* =============================================================== help popover */
+$('helpBtn').onclick = e => { e.stopPropagation(); $('help').classList.toggle('open'); };
+addEventListener('click', e => { if (!$('help').contains(e.target)) $('help').classList.remove('open'); });
+
+/* =============================================================== hand panel: highlight the active gesture, collapse */
+(function () {
+  const map = { STEER: 'chipOpen', ZOOM: 'chipV', SELECT: 'chipPoint', PLAY: 'chipFist' };
+  const chips = Object.values(map).map($);
+  let last = '';
+  new MutationObserver(() => {
+    const t = $('gname').textContent.toUpperCase();
+    if (t === last) return; last = t;
+    chips.forEach(c => c.classList.remove('on'));
+    for (const k in map) if (t.includes(k)) $(map[k]).classList.add('on');
+  }).observe($('gname'), { childList: true, characterData: true, subtree: true });
+  $('gtoggle').onclick = () => { $('gcam').classList.toggle('min'); $('gtoggle').innerHTML = $('gcam').classList.contains('min') ? '&#9652;' : '&#9662;'; };
+})();
+
+/* =============================================================== music (your trimmed Interstellar theme, plays offline) */
+(function () {
+  const au = new Audio('/static/audio/interstellar_theme.mp3');
+  au.loop = true; au.preload = 'auto';
+  let want = store.get('solar-music', 'on') !== 'off', vol = +store.get('solar-vol', '0.55'), duckNow = 1, duckTo = 1;
+  $('vol').value = Math.round(vol * 100);
+  const apply = () => { au.volume = Math.max(0, Math.min(1, vol * duckNow)); };
+  const ui = () => $('musicBtn').classList.toggle('playing', !au.paused);
+  apply();
+  async function play() { if (!want) return false; try { await au.play(); ui(); return true; } catch (e) { return false; } }
+  au.addEventListener('error', () => { $('music').style.display = 'none'; });
+  let armed = true;
+  const first = () => { if (!armed) return; armed = false; $('toast').classList.remove('show'); play(); };
+  ['pointerdown', 'keydown'].forEach(ev => addEventListener(ev, first, { capture: true }));
+  play().then(ok => { if (!ok && want) toast('Click anywhere to start the Interstellar theme'); else armed = false; });
+  $('musicBtn').onclick = e => {
+    e.stopPropagation(); armed = false;
+    want = au.paused; store.set('solar-music', want ? 'on' : 'off');
+    if (want) play(); else { au.pause(); ui(); }
+  };
+  $('vol').oninput = e => { vol = e.target.value / 100; store.set('solar-vol', vol); apply(); };
+  (function fade() { duckNow += (duckTo - duckNow) * 0.06; apply(); requestAnimationFrame(fade); })();
+  window.__duck = on => { duckTo = on ? 0.28 : 1; };      // music gets quieter while the assistant talks or listens
+})();
+
+/* =============================================================== assistant: chat */
+const msgs = $('msgs');
+let history = [], busy = false, state = 'idle';
+
+function addMsg(role, text) {
+  const d = document.createElement('div'); d.className = 'msg ' + role; d.textContent = text;
+  msgs.appendChild(d); msgs.scrollTop = msgs.scrollHeight; return d;
+}
+function addTyping() {
+  const d = document.createElement('div'); d.className = 'msg bot';
+  d.innerHTML = '<span class="typing"><i></i><i></i><i></i></span>';
+  msgs.appendChild(d); msgs.scrollTop = msgs.scrollHeight; return d;
+}
+addMsg('bot', "Hi, I'm your space guide. Ask me anything about the solar system, or tell me what to do: I can use every control in the app for you, like flying to a planet, changing the date, or hiding the orbits. Ask for a detailed answer and I'll go deep.");
+
+/* ---- the assistant can use every control of the app, the same way a person would (each action clicks / drags / types the real control) ---- */
+const BASE_DAY = Date.UTC(2000, 0, 1);                                   // the date slider counts days since 2000-01-01
+const dayToIso = n => new Date(BASE_DAY + n * 86400000).toISOString().slice(0, 10);
+const SPEED_VALUE = { slow: '1', medium: '5', fast: '20', veryfast: '90' };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const fire = (el, type) => el.dispatchEvent(new Event(type, { bubbles: true }));
+function setChecked(id, on) { const el = $(id); if (el.checked !== on) { el.checked = on; fire(el, 'change'); } }
+function ease(ms, fn) { const t0 = performance.now(); (function f() { const k = Math.min(1, (performance.now() - t0) / ms); fn(k * (2 - k)); if (k < 1) requestAnimationFrame(f); })(); }
+async function whenQuiet() { for (let i = 0; i < 300 && (state === 'speaking' || state === 'thinking'); i++) await sleep(300); }   // wait for the assistant to finish talking
+
+function uiState() {                      // sent with every question so the assistant knows what the controls look like right now
+  const sp = $('speed'), sl = $('slider'), sfOpen = $('surface').classList.contains('open');
+  return [
+    'time ' + (S.playing ? 'playing' : 'paused') + ' at ' + sp.options[sp.selectedIndex].text.toLowerCase() + ' speed',
+    'orbits ' + ($('tOrbits').checked ? 'shown' : 'hidden'), 'belts ' + ($('tBelts').checked ? 'shown' : 'hidden'),
+    'hand gestures ' + ($('tGest').checked ? 'on' : 'off'), 'fly mode ' + (S.flying ? 'on' : 'off'),
+    'music ' + ($('musicBtn').classList.contains('playing') ? 'on' : 'off') + ' at volume ' + $('vol').value,
+    'surface view ' + (sfOpen ? 'open on ' + $('sfTitle').textContent.split(' \u00B7 ')[0] : 'closed'),
+    'assistant mode ' + (body.classList.contains('voice') ? 'voice' : 'text'),
+    'supported dates ' + dayToIso(+sl.min) + ' to ' + dayToIso(+sl.max),
+  ].join('; ');
+}
+
+function setDate(spec) {                  // the date slider: an ISO date, "now", or a jump like +10y / -6m / +2w / +30d
+  const sl = $('slider'), min = +sl.min, max = +sl.max;
+  let day;
+  if (spec === 'now') day = Math.floor((Date.now() - BASE_DAY) / 86400000);
+  else if (/^\d{4}-\d{2}-\d{2}$/.test(spec)) {
+    const [y, m, d] = spec.split('-').map(Number);
+    day = y < 1900 ? min - 1 : Math.round((Date.UTC(y, m - 1, d) - BASE_DAY) / 86400000);
+  } else {
+    const m = /^([+-])(\d+)([dwmy])$/.exec(spec); if (!m) return;
+    const n = (m[1] === '-' ? -1 : 1) * +m[2], dt = new Date(BASE_DAY + (+sl.value) * 86400000);
+    if (m[3] === 'd') dt.setUTCDate(dt.getUTCDate() + n); else if (m[3] === 'w') dt.setUTCDate(dt.getUTCDate() + 7 * n);
+    else {                                                              // months / years: keep the day, but never spill into the next month (Jan 31 + 1 month = Feb 28)
+      const keep = dt.getUTCDate(); dt.setUTCDate(1);
+      if (m[3] === 'm') dt.setUTCMonth(dt.getUTCMonth() + n); else dt.setUTCFullYear(dt.getUTCFullYear() + n);
+      dt.setUTCDate(Math.min(keep, new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth() + 1, 0)).getUTCDate()));
+    }
+    day = Math.round((dt.getTime() - BASE_DAY) / 86400000);
+  }
+  const to = Math.max(min, Math.min(max, day));
+  sl.value = to; fire(sl, 'input');
+  if (to !== day) return 'That date is outside the data range, so I moved to ' + dayToIso(to) + ' instead.';
+}
+function surfaceZoom(dir) {
+  view.auto = false; const f0 = view.fov, f1 = Math.max(26, Math.min(95, f0 * (dir === 'in' ? 0.6 : 1.6)));
+  ease(400, k => { view.fov = f0 + (f1 - f0) * k; });
+}
+function surfaceRotate(dir) {
+  view.auto = false; const y0 = view.yaw, p0 = view.pitch, dy = dir === 'left' ? 0.7 : dir === 'right' ? -0.7 : 0, dp = dir === 'up' ? 0.4 : dir === 'down' ? -0.4 : 0;
+  ease(500, k => { view.yaw = y0 + dy * k; view.pitch = p0 + dp * k; });
+}
+
+async function runAction(a) {             // returns a short note for the user when something could not be done as asked
+  if (!a) return;
+  const sfOpen = $('surface').classList.contains('open');
+  switch (a.type) {
+    case 'go': if (sfOpen) closeSurface(); S.select(a.body, true); return;
+    case 'surface': openSurface(a.body); return;
+    case 'close_surface': if (sfOpen) closeSurface(); return;
+    case 'panorama': {
+      const thumbs = [...document.querySelectorAll('.sf-thumb')];
+      if (!sfOpen || !thumbs.length) return 'Open a surface view first, then I can switch between its photos.';
+      const cur = Math.max(0, thumbs.findIndex(t => t.classList.contains('on')));
+      const i = a.which === 'next' ? (cur + 1) % thumbs.length : a.which === 'prev' ? (cur - 1 + thumbs.length) % thumbs.length : Math.min(thumbs.length, a.which) - 1;
+      thumbs[i].click(); thumbs[i].scrollIntoView({ block: 'nearest', inline: 'center' }); return;
+    }
+    case 'date': return setDate(a.value);
+    case 'play': case 'pause': if (S.playing !== (a.type === 'play')) $('play').click(); return;
+    case 'speed': { const sp = $('speed'); sp.value = SPEED_VALUE[a.value]; fire(sp, 'change'); return; }
+    case 'reset': if (sfOpen) closeSurface(); $('reset').click(); return;
+    case 'orbits': setChecked('tOrbits', a.on); return;
+    case 'belts': setChecked('tBelts', a.on); return;
+    case 'gestures': setChecked('tGest', a.on); return;
+    case 'fly': S.setFly(a.on); return;
+    case 'zoom': if (sfOpen) surfaceZoom(a.value); else S.zoom(a.value); return;
+    case 'rotate': if (sfOpen) surfaceRotate(a.value); else S.rotate(a.value); return;
+    case 'music': if (a.on !== $('musicBtn').classList.contains('playing')) $('musicBtn').click(); return;
+    case 'volume': { const v = $('vol'), n = a.value === 'up' ? +v.value + 15 : a.value === 'down' ? +v.value - 15 : a.value; v.value = Math.max(0, Math.min(100, n)); fire(v, 'input'); return; }
+    case 'weight': { const w = document.getElementById('w'); if (!w) return 'Pick a planet first, then I can fill in the weight calculator.'; w.value = a.kg; fire(w, 'input'); return; }
+    case 'help': $('help').classList.toggle('open', a.on); return;
+    case 'tab': await whenQuiet(); showTab('info'); return;           // leaving the assistant would cut off its speech, so wait
+    case 'mode': await whenQuiet(); setMode(a.value === 'voice'); return;
+    case 'keeplisten': $('keepListen').checked = a.on; return;
+    case 'interrupt': $('bargeIn').checked = a.on; return;
+    case 'sensitivity': setBargeSens(a.value); return;
+  }
+}
+async function runActions(list, delay) {
+  if (!list || !list.length) return;
+  await sleep(delay);
+  const notes = [];
+  for (const a of list) {
+    try { const n = await runAction(a); if (n) notes.push(n); } catch (e) { console.warn('assistant action failed', a, e); }
+    await sleep(350);                                                  // let a camera flight or a panel open before the next step
+  }
+  notes.forEach(n => addMsg('note', n));
+}
+
+async function send(text) {
+  text = (text || '').trim();
+  if (!text || busy) return;
+  busy = true; $('chips').style.display = 'none';
+  addMsg('user', text);
+  setState('thinking');
+  const typing = addTyping();
+  let answer = '', actions = [], note = '';
+  currentReq = new AbortController();
+  try {
+    if (!navigator.onLine) throw Object.assign(new Error('offline'), { offline: true });
+    const ctx = S.context();
+    const r = await fetch('/api/assistant', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: currentReq.signal,
+      body: JSON.stringify({ message: text, history: history.slice(-8), selected: ctx.selected, context: ctx.facts, date: ctx.date, ui: uiState(), voice: body.classList.contains('voice') }) });
+    const d = await r.json();
+    if (!r.ok || d.error) throw Object.assign(new Error(d.error || 'The assistant is unavailable.'), { server: true });
+    answer = d.answer; actions = d.actions || (d.action ? [d.action] : []);
+  } catch (e) {
+    if (e && e.name === 'AbortError') { typing.remove(); addMsg('note', 'Interrupted'); busy = false; return; }   // you spoke over it
+    answer = '';
+    note = e.server ? e.message : (e.offline || !navigator.onLine ? 'You are offline, and the assistant needs the internet.' : 'Could not reach the assistant. Check the connection and try again.');
+  }
+  typing.remove();
+  if (answer) history.push({ role: 'user', text }, { role: 'guide', text: answer });
+  if (answer) addMsg('bot', answer);
+  if (note) addMsg('note', note);
+  busy = false;
+  if (answer && body.classList.contains('voice')) speak(answer); else setState('idle');
+  runActions(actions, body.classList.contains('voice') ? 900 : 350);
+}
+$('sendBtn').onclick = () => { const v = $('chatIn').value; $('chatIn').value = ''; send(v); };
+$('chatIn').addEventListener('keydown', e => { if (e.key === 'Enter') $('sendBtn').click(); });
+document.querySelectorAll('#chips .chip').forEach(c => c.onclick = () => send(c.dataset.q));
+
+/* =============================================================== assistant: voice + glowing orb */
+const CAP = { idle: 'Tap the orb to talk', listening: 'Listening', thinking: 'Thinking', speaking: 'Speaking' };
+let micOn = true, micBlocked = false, curUtter = null, currentReq = null;
+const barge = makeBargeDetector();          // decides when your voice should stop the assistant (see the detector below)
+let bargeSens = 'normal';
+const voiceOpen = () => body.classList.contains('tab-assist') && body.classList.contains('voice');
+
+function setState(s) {
+  state = s;
+  $('orbCap').textContent = (!micOn && s === 'idle') ? 'Microphone off' : CAP[s];
+  $('astate').textContent = s === 'idle' ? 'Online · needs internet' : CAP[s] + '…';
+  if (s === 'thinking' || s === 'speaking') barge.reset(performance.now(), s === 'speaking' ? 900 : 0);   // while it starts speaking, learn its echo and do not trigger
+  if (window.__duck) window.__duck(s === 'listening' || s === 'speaking');
+}
+function setMode(voice) {
+  body.classList.toggle('voice', voice);
+  $('mVoice').classList.toggle('on', voice); $('mText').classList.toggle('on', !voice);
+  if (voice) { if (micOn) ensureMic(); }
+  else { stopListening(); stopSpeaking(); closeMic(); setState('idle'); }
+  syncOrb();
+  if (voice) $('orbCap').textContent = (!micOn && state === 'idle') ? 'Microphone off' : CAP[state];
+}
+$('mText').onclick = () => setMode(false);
+$('mVoice').onclick = () => setMode(true);
+$('micBtn').onclick = () => { setMode(true); };
+
+/* ---- microphone: one stream is kept open while voice mode is on, so interrupting by talking is instant ---- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, micStream = null, audioCtx = null, analyser = null, micData = null, vadAnalyser = null, vadData = null, micLevel = 0, heard = '', finalHeard = '', lastErr = '';
+async function ensureMic() {
+  if (micStream) return true;
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    micBlocked = false;
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const src = audioCtx.createMediaStreamSource(micStream);
+    analyser = audioCtx.createAnalyser(); analyser.fftSize = 512;           // broadband level: drives the orb
+    src.connect(analyser);
+    micData = new Uint8Array(analyser.fftSize);
+    const hp = audioCtx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 140; hp.Q.value = 0.7;   // keep only the speech band for interrupt
+    const lp = audioCtx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3800; lp.Q.value = 0.7;   // detection: ignores desk thumps and hiss
+    vadAnalyser = audioCtx.createAnalyser(); vadAnalyser.fftSize = 1024;
+    src.connect(hp); hp.connect(lp); lp.connect(vadAnalyser);
+    vadData = new Float32Array(vadAnalyser.fftSize);
+    return true;
+  } catch (e) {
+    micStream = null; analyser = null; vadAnalyser = null;
+    if (e && e.name === 'NotAllowedError') micBlocked = true;
+    return false;
+  }
+}
+function closeMic() { if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; } analyser = null; vadAnalyser = null; }
+function readLevel() {
+  if (!analyser) return 0;
+  analyser.getByteTimeDomainData(micData);
+  let s = 0; for (let i = 0; i < micData.length; i++) { const v = (micData[i] - 128) / 128; s += v * v; }
+  return Math.min(1, Math.sqrt(s / micData.length) * 5);
+}
+function readVad() {
+  if (!vadAnalyser) return 0;
+  vadAnalyser.getFloatTimeDomainData(vadData);
+  let s = 0; for (let i = 0; i < vadData.length; i++) s += vadData[i] * vadData[i];
+  return Math.min(1, Math.sqrt(s / vadData.length) * 5);
+}
+function setMic(on) {
+  micOn = on;
+  $('micToggle').classList.toggle('off', !on); $('micToggle').setAttribute('aria-pressed', on);
+  $('micToggle').title = on ? 'Microphone is on (click to mute)' : 'Microphone is off (click to turn on)';
+  $('voiceView').classList.toggle('muted', !on);
+  if (!on) { stopListening(); closeMic(); if (state === 'listening') setState('idle'); }
+  else if (voiceOpen()) ensureMic();
+  if (state === 'idle') $('orbCap').textContent = on ? CAP.idle : 'Microphone off';
+}
+$('micToggle').onclick = () => setMic(!micOn);
+
+/* ---- subtitles: the answer is shown word by word, highlighted as it is spoken (karaoke style) ---- */
+let kar = null;
+function setSub(text, cls) { const b = $('orbTxt'); b.className = cls || ''; b.textContent = text || ''; b.scrollTop = 0; kar = null; }
+function startKaraoke(text) {
+  const box = $('orbTxt'); box.textContent = ''; box.className = 'karaoke'; box.scrollTop = 0;
+  const words = [], re = /\S+/g; let m, acc = 0;
+  while ((m = re.exec(text))) {
+    const el = document.createElement('span'); el.className = 'w'; el.textContent = m[0];
+    box.appendChild(el); box.appendChild(document.createTextNode(' '));
+    words.push({ el, start: m.index, end: m.index + m[0].length, at: acc }); acc += m[0].length + 1;
+  }
+  kar = { words, idx: -1, t0: performance.now(), sync: false, total: acc };
+}
+function karaokeAt(i) {
+  if (!kar || i <= kar.idx) return;
+  kar.idx = Math.min(i, kar.words.length - 1);
+  kar.words.forEach((w, k) => { w.el.classList.toggle('done', k < kar.idx); w.el.classList.toggle('cur', k === kar.idx); });
+  const box = $('orbTxt'), el = kar.words[kar.idx].el;
+  box.scrollTop = Math.max(0, el.offsetTop - box.clientHeight / 2 + el.offsetHeight);
+}
+function karaokeEnd(all) {
+  if (!kar) return;
+  kar.words.forEach((w, k) => { w.el.classList.remove('cur'); w.el.classList.toggle('done', all || k <= kar.idx); w.el.classList.toggle('cut', !all && k > kar.idx); });
+}
+
+/* ---- listening ---- */
+async function startListening() {
+  if (!micOn) { $('orbCap').textContent = 'Microphone off'; return; }
+  if (!SR) { $('orbCap').textContent = 'Voice input needs Chrome'; return; }
+  if (state === 'listening' || state === 'thinking') return;
+  stopSpeaking();
+  heard = ''; finalHeard = ''; lastErr = '';
+  setSub('', 'you'); setState('listening');
+  const ok = await ensureMic();
+  if (!ok && micBlocked) { setState('idle'); $('orbCap').textContent = 'Microphone blocked: allow it in the address bar'; return; }
+  if (state !== 'listening') return;
+  rec = new SR(); rec.lang = 'en-US'; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
+  rec.onresult = ev => {
+    let interim = '', fin = '';
+    for (let i = ev.resultIndex; i < ev.results.length; i++) {
+      const t = ev.results[i][0].transcript;
+      if (ev.results[i].isFinal) fin += t; else interim += t;
+    }
+    heard = fin || interim; if (fin) finalHeard = fin;
+    setSub('\u201C' + heard + '\u201D', 'you');
+  };
+  rec.onerror = ev => { lastErr = ev.error; };
+  rec.onend = () => {
+    rec = null;
+    if (state !== 'listening') return;
+    const said = (finalHeard || heard).trim();
+    if (said) { send(said); return; }
+    setState('idle');
+    $('orbCap').textContent = lastErr === 'network' ? 'Voice needs internet' :
+      (lastErr === 'not-allowed' || lastErr === 'service-not-allowed') ? 'Microphone blocked' : "Didn't catch that. Tap the orb";
+  };
+  try { rec.start(); } catch (e) { setState('idle'); }
+}
+function stopListening() { if (rec) { try { rec.stop(); } catch (e) {} } }
+
+/* ---- speaking ---- */
+function pickVoice() {
+  const vs = speechSynthesis.getVoices().filter(v => /^en/i.test(v.lang));
+  return vs.find(v => /Google UK English Male|Google US English/i.test(v.name)) ||
+         vs.find(v => /Natural|Online|Aria|Guy|Jenny|Daniel|Samantha|Alex/i.test(v.name)) || vs[0];
+}
+let envPulse = 0, liveUtter = null;
+const RATE = 1.06;
+/* Chrome silently stops a single spoken utterance after ~15 s, which would cut a detailed answer off halfway. So the
+   answer is said in sentence-sized pieces, one after the other; each piece remembers where it starts for the karaoke text. */
+function chunkText(text, max = 190) {
+  const raw = text.match(/[\s\S]+?(?:[.!?]+["')\]]*(?=\s|$)|\n+|$)\s*/g) || [text], parts = [];
+  for (let s = 0; s < raw.length; s++) {
+    let t = raw[s];
+    while (t.length > max) { let i = t.lastIndexOf(' ', max); if (i < max * 0.5) i = max; parts.push(t.slice(0, i + 1)); t = t.slice(i + 1); }
+    if (t) parts.push(t);
+  }
+  if (parts.join('') !== text) return [{ text, offset: 0 }];
+  const out = []; let pos = 0, cur = null;
+  for (const t of parts) {
+    if (cur && cur.text.length + t.length <= max) cur.text += t; else { cur = { text: t, offset: pos }; out.push(cur); }
+    pos += t.length;
+  }
+  return out;
+}
+function speak(text) {
+  if (!('speechSynthesis' in window)) { setState('idle'); return; }
+  speechSynthesis.cancel();
+  const token = {}; curUtter = token;
+  const chunks = chunkText(text), v = pickVoice();
+  let n = 0;
+  startKaraoke(text);
+  const finish = () => {
+    if (curUtter !== token) return;                                      // already interrupted
+    curUtter = null; liveUtter = null; karaokeEnd(true);
+    if (state === 'speaking') setState('idle');
+    if ($('keepListen').checked && micOn && voiceOpen()) setTimeout(startListening, 350);
+  };
+  const next = () => {
+    if (curUtter !== token) return;
+    if (n >= chunks.length) { finish(); return; }
+    const c = chunks[n++], u = new SpeechSynthesisUtterance(c.text), first = n === 1;
+    if (v) { u.voice = v; u.lang = v.lang; }
+    u.rate = RATE; liveUtter = u;                                        // keep a reference: Chrome can drop an utterance it thinks is unused
+    u.onstart = () => { if (first && curUtter === token) barge.learnUntil = performance.now() + 350; };   // audio really started: learn its echo for 350 ms
+    u.onboundary = e => {
+      envPulse = 1;
+      if (kar && (e.name === 'word' || e.name === undefined)) {          // real word timing, when this voice provides it
+        kar.sync = true;
+        const at = c.offset + e.charIndex, i = kar.words.findIndex(w => at >= w.start && at < w.end + 1);
+        if (i >= 0) karaokeAt(i);
+      }
+    };
+    u.onend = next;
+    u.onerror = e => { if (curUtter !== token) return; if (e && (e.error === 'interrupted' || e.error === 'canceled')) finish(); else next(); };
+    speechSynthesis.speak(u);
+  };
+  setState('speaking');
+  next();
+}
+function stopSpeaking() {
+  curUtter = null;
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
+  karaokeEnd(false);
+  if (state === 'speaking') setState('idle');
+}
+
+
+/* ---- interrupt detector (BARGE-DETECTOR-START) ----
+   Old version: one 450 ms snapshot of the speaker echo set a threshold as high as 0.92, and a single quiet gap reset the timer,
+   so ordinary speech never got through. This one: only speech-band sound is measured, the echo level is tracked continuously
+   (fast attack, slow decay), and short gaps between words only drain the timer instead of resetting it. */
+const BARGE_PRESETS = {                                      // ratio = how much louder than the echo you must be; floor = quietest voice that counts; hold = ms of speech needed
+  low:    { ratio: 1.9,  floor: 0.14, hold: 220 },
+  normal: { ratio: 1.35, floor: 0.07, hold: 120 },
+  high:   { ratio: 1.12, floor: 0.04, hold: 70 },
+};
+function makeBargeDetector() {
+  const d = { echo: 0, acc: 0, learnUntil: 0, thr: 0 };
+  d.reset = (now, learnMs) => { d.echo = 0; d.acc = 0; d.learnUntil = now + (learnMs || 0); };
+  // level: 0..1 speech-band loudness this frame, dt: seconds, now: ms, cfg: a BARGE_PRESETS entry, speaking: false while only "thinking"
+  d.update = (level, dt, now, cfg, speaking) => {
+    if (speaking) {
+      d.thr = Math.max(cfg.floor, d.echo * cfg.ratio + cfg.floor * 0.5);
+      const learning = now < d.learnUntil;
+      if (level > d.echo) { if (learning || level < d.thr) d.echo += (level - d.echo) * Math.min(1, dt * 14); }   // echo peaks: learn quickly, but never learn a real voice
+      else d.echo += (level - d.echo) * Math.min(1, dt * 0.9);                                                     // ...and forget slowly
+      if (learning) { d.acc = 0; return false; }
+    } else d.thr = cfg.floor;
+    if (level > d.thr) d.acc += dt; else d.acc = Math.max(0, d.acc - dt * 2);
+    return d.acc * 1000 >= cfg.hold;
+  };
+  return d;
+}
+/* ---- interrupt detector (BARGE-DETECTOR-END) ---- */
+
+/* ---- interrupting: just start talking while it speaks or thinks ---- */
+function interrupt() {
+  barge.acc = 0;
+  if (state === 'speaking') { stopSpeaking(); startListening(); }
+  else if (state === 'thinking') { if (currentReq) currentReq.abort(); setState('idle'); startListening(); }
+}
+
+function setBargeSens(k) {
+  if (!BARGE_PRESETS[k]) return;
+  bargeSens = k; store.set('solar-barge', k);
+  document.querySelectorAll('#bargeSens button').forEach(b => b.classList.toggle('on', b.dataset.s === k));
+}
+document.querySelectorAll('#bargeSens button').forEach(b => b.onclick = () => setBargeSens(b.dataset.s));
+setBargeSens(store.get('solar-barge', 'normal'));
+
+$('orb').onclick = () => {
+  if (!micOn) { setMic(true); if (state === 'idle') startListening(); return; }
+  if (state === 'listening') stopListening();
+  else if (state === 'speaking') stopSpeaking();
+  else if (state === 'thinking') { if (currentReq) currentReq.abort(); setState('idle'); }
+  else if (state === 'idle') startListening();
+};
+addEventListener('keydown', e => {
+  if (e.code === 'Space' && voiceOpen() && !['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(e.target.tagName)) {
+    e.preventDefault(); $('orb').click();
+  }
+});
+
+/* ---- the orb: breathes when idle, reacts to your voice, swirls while thinking, pulses while speaking ---- */
+const oc = $('orb'), ox = oc.getContext('2d'), OW = oc.width, C = OW / 2, TAU = Math.PI * 2;
+const PAL = { idle: [[103, 232, 249], [99, 102, 241]], listening: [[52, 211, 153], [34, 211, 238]],
+              thinking: [[167, 139, 250], [244, 114, 182]], speaking: [[147, 197, 253], [224, 242, 254]] };
+let col = [PAL.idle[0].slice(), PAL.idle[1].slice()], lv = 0, spin = 0, rings = [], lastRing = 0, orbRAF = 0, tPrev = 0;
+const rgba = (c, a) => 'rgba(' + c.map(Math.round).join(',') + ',' + a + ')';
+
+function orbFrame(t) {
+  orbRAF = requestAnimationFrame(orbFrame);
+  const dt = Math.min(0.05, (t - tPrev) / 1000 || 0.016); tPrev = t;
+  if (analyser && micOn) micLevel = readLevel(); else micLevel = 0;
+
+  if ((state === 'speaking' || state === 'thinking') && micOn && vadAnalyser && $('bargeIn').checked) {
+    barge.level = readVad();
+    if (barge.update(barge.level, dt, performance.now(), BARGE_PRESETS[bargeSens] || BARGE_PRESETS.normal, state === 'speaking')) interrupt();
+  } else barge.acc = 0;
+  if (state === 'speaking' && kar && !kar.sync) {                                                    // no word events: follow the clock
+    const pos = Math.max(0, (performance.now() - kar.t0) / 1000 - 0.25) * 15 * RATE;
+    let i = kar.idx; while (i + 1 < kar.words.length && kar.words[i + 1].at <= pos) i++;
+    if (i > kar.idx) karaokeAt(i);
+  }
+
+  let target = 0.05;
+  if (state === 'listening') target = Math.max(0.12, micLevel || (0.25 + 0.2 * Math.sin(t * 0.006)));
+  else if (state === 'speaking') { envPulse *= Math.pow(0.02, dt); target = 0.26 + envPulse * 0.55 + 0.08 * Math.sin(t * 0.011); }
+  else if (state === 'thinking') target = 0.3;
+  lv += (target - lv) * Math.min(1, dt * 9);
+  const want = PAL[state];
+  for (let i = 0; i < 2; i++) for (let j = 0; j < 3; j++) col[i][j] += (want[i][j] - col[i][j]) * Math.min(1, dt * 4);
+  spin += dt * (state === 'thinking' ? 2.8 : state === 'listening' ? 1.5 : state === 'speaking' ? 1.9 : 0.7);
+
+  const R = C * 0.44 * (1 + 0.05 * Math.sin(t * 0.0016) + lv * 0.22);       // slow breathing + level
+  ox.clearRect(0, 0, OW, OW);
+  ox.globalCompositeOperation = 'source-over';
+  const halo = ox.createRadialGradient(C, C, R * 0.5, C, C, C);
+  halo.addColorStop(0, rgba(col[0], 0.30 + lv * 0.3)); halo.addColorStop(0.6, rgba(col[1], 0.08)); halo.addColorStop(1, rgba(col[1], 0));
+  ox.fillStyle = halo; ox.fillRect(0, 0, OW, OW);
+
+  const layers = state === 'thinking' ? 4 : 3;
+  for (let l = 0; l < layers; l++) {
+    const ph = l * 1.7;
+    const amp = (state === 'idle' ? 0.035 : state === 'thinking' ? 0.11 : 0.05 + lv * 0.17) * (1 - l * 0.12);
+    ox.beginPath();
+    for (let i = 0; i <= 120; i++) {
+      const th = i / 120 * TAU;
+      const w = Math.sin(th * 3 + spin * (1 + l * 0.3) + ph) * 0.5 + Math.sin(th * 5 - spin * 1.3 * (1 + l * 0.2) + ph * 2) * 0.3 + Math.sin(th * 2 + spin * 0.8 - ph) * 0.6;
+      const r = R * (1 - l * 0.05) * (1 + amp * w);
+      const x = C + Math.cos(th) * r, y = C + Math.sin(th) * r;
+      i ? ox.lineTo(x, y) : ox.moveTo(x, y);
+    }
+    ox.closePath();
+    const ka = l === 0 ? 1 : 0.34 - l * 0.06;                          // the first layer is the body, the others add soft glow
+    const g = ox.createRadialGradient(C - R * 0.28, C - R * 0.32, R * 0.05, C, C, R * 1.15);
+    g.addColorStop(0, l === 0 ? 'rgba(255,255,255,0.38)' : rgba(col[0], 0.5 * ka));
+    g.addColorStop(0.3, rgba(col[0], 0.92 * ka)); g.addColorStop(1, rgba(col[1], 0.85 * ka));
+    ox.globalCompositeOperation = l ? 'lighter' : 'source-over';
+    ox.fillStyle = g; ox.shadowColor = rgba(col[0], 0.85); ox.shadowBlur = l ? 0 : 26 + lv * 38; ox.fill();
+  }
+  ox.shadowBlur = 0; ox.globalCompositeOperation = 'source-over';
+
+  if (state === 'thinking') {                                              // orbiting arcs
+    ox.lineCap = 'round'; ox.lineWidth = 4;
+    for (let k = 0; k < 3; k++) {
+      ox.strokeStyle = rgba(col[k % 2], 0.85);
+      const a0 = spin * (k % 2 ? -1 : 1) * (0.9 + k * 0.35) + k * 2.1;
+      ox.beginPath(); ox.arc(C, C, R * (1.2 + k * 0.09), a0, a0 + 0.9 + k * 0.25); ox.stroke();
+    }
+  }
+  const pulse = state === 'speaking' ? envPulse : state === 'listening' ? micLevel : 0;
+  if (pulse > 0.8 && t - lastRing > 220) { rings.push({ r: R * 1.05, a: 0.55 }); lastRing = t; }
+  rings = rings.filter(g => (g.a -= dt * 0.7) > 0);
+  rings.forEach(g => { g.r += dt * 140; ox.strokeStyle = rgba(col[0], g.a); ox.lineWidth = 2; ox.beginPath(); ox.arc(C, C, g.r, 0, TAU); ox.stroke(); });
+}
+function syncOrb() {
+  const visible = voiceOpen() && !document.hidden;
+  if (visible && !orbRAF) orbRAF = requestAnimationFrame(orbFrame);
+  if (!visible && orbRAF) { cancelAnimationFrame(orbRAF); orbRAF = 0; }
+}
+document.addEventListener('visibilitychange', syncOrb);
+if ('speechSynthesis' in window) speechSynthesis.onvoiceschanged = () => {};
+
+/* =============================================================== 360 degree surface viewer */
+const BACK = { Mars: ['#1a0e0b', '#8f5037', '#4a2a1e'], Moon: ['#000000', '#1a1a1a', '#2e2e2e'], Venus: ['#2a1505', '#c9822f', '#5a3412'] };
+const sfEl = $('surface'), sfCanvas = $('sfc');
+let sf = null, sfRAF = 0, sfToken = 0;
+const view = { yaw: 0, pitch: 0, fov: 75, vy: 0, vp: 0, drag: false, auto: true, yawLim: Infinity, pitchLim: 1.45, full: true };
+
+function initSf() {
+  if (sf) return;
+  const renderer = new THREE.WebGLRenderer({ canvas: sfCanvas, antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(view.fov, 1, 0.1, 500);
+  camera.rotation.order = 'YXZ';
+  sf = { renderer, scene, camera, mesh: null, back: null };
+  const resize = () => { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); };
+  addEventListener('resize', resize); resize();
+  let px = 0, py = 0;
+  sfCanvas.addEventListener('pointerdown', e => { view.drag = true; view.auto = false; px = e.clientX; py = e.clientY; sfCanvas.classList.add('drag'); sfCanvas.setPointerCapture(e.pointerId); });
+  sfCanvas.addEventListener('pointermove', e => {
+    if (!view.drag) return;
+    const k = 0.0042 * (view.fov / 75);
+    view.vy = (e.clientX - px) * k; view.vp = (e.clientY - py) * k;
+    view.yaw += view.vy; view.pitch += view.vp; px = e.clientX; py = e.clientY;
+  });
+  const up = () => { view.drag = false; sfCanvas.classList.remove('drag'); };
+  sfCanvas.addEventListener('pointerup', up); sfCanvas.addEventListener('pointercancel', up);
+  sfCanvas.addEventListener('wheel', e => { e.preventDefault(); view.fov = Math.max(26, Math.min(95, view.fov + e.deltaY * 0.04)); view.auto = false; }, { passive: false });
+}
+function clampView() {
+  const vf = view.fov * Math.PI / 180, hf = 2 * Math.atan(Math.tan(vf / 2) * (innerWidth / innerHeight));
+  view.pitchLim = view.full ? 1.5 : Math.max(0.06, view.pitchBase - vf / 2) + 0.1;
+  view.pitch = Math.max(-view.pitchLim, Math.min(view.pitchLim, view.pitch));
+  if (!view.full) { const lim = Math.max(0.12, view.halfCover - hf / 2 + 0.12); view.yaw = Math.max(-lim, Math.min(lim, view.yaw)); }
+}
+function sfFrame() {
+  sfRAF = requestAnimationFrame(sfFrame);
+  if (!view.drag) {
+    view.yaw += view.vy; view.pitch += view.vp; view.vy *= 0.92; view.vp *= 0.92;
+    if (view.auto && view.full) view.yaw += 0.0016;
+  }
+  clampView();
+  sf.camera.fov = view.fov; sf.camera.updateProjectionMatrix();
+  sf.camera.rotation.set(view.pitch, view.yaw, 0);
+  sf.renderer.render(sf.scene, sf.camera);
+}
+function setLoading(html, show = true) { const l = $('sfLoading'); l.innerHTML = html; l.classList.toggle('show', show); }
+
+function backdrop(bodyName) {
+  const c = BACK[bodyName] || BACK.Mars, cv = document.createElement('canvas'); cv.width = 4; cv.height = 256;
+  const g = cv.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 256);
+  gr.addColorStop(0, c[0]); gr.addColorStop(0.5, c[1]); gr.addColorStop(0.52, c[2]); gr.addColorStop(1, c[0]);
+  g.fillStyle = gr; g.fillRect(0, 0, 4, 256);
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
+  const geo = new THREE.SphereGeometry(200, 32, 24); geo.scale(-1, 1, 1);
+  return new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: t }));
+}
+
+function showPano(img, item, bodyName, offline, keepView) {
+  const maxT = Math.min(8192, sf.renderer.capabilities.maxTextureSize);
+  const k = Math.min(1, maxT / Math.max(img.naturalWidth, img.naturalHeight));
+  const cv = document.createElement('canvas'); cv.width = Math.round(img.naturalWidth * k); cv.height = Math.round(img.naturalHeight * k);
+  cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+  const aspect = img.naturalWidth / img.naturalHeight;
+
+  let geo, coverage;
+  if (aspect > 1.85 && aspect < 2.15) {                               // a full equirectangular sphere photo
+    geo = new THREE.SphereGeometry(50, 96, 64); coverage = 360; view.full = true;
+  } else {                                                            // a wide strip: wrap it as a cylinder of the right angle
+    coverage = aspect >= 6 ? 360 : Math.max(60, Math.min(340, aspect * 38));
+    const th = coverage * Math.PI / 180, H = 50 * th / aspect;
+    geo = new THREE.CylinderGeometry(50, 50, H, 128, 1, true, Math.PI - th / 2, th);
+    view.full = coverage >= 330; view.halfCover = th / 2; view.pitchBase = Math.atan((H / 2) / 50);
+  }
+  geo.scale(-1, 1, 1);                                                // look from the inside, not mirrored
+  if (sf.mesh) { sf.scene.remove(sf.mesh); sf.mesh.geometry.dispose(); sf.mesh.material.map.dispose(); sf.mesh.material.dispose(); }
+  if (sf.back) sf.scene.remove(sf.back);
+  sf.back = backdrop(bodyName); sf.scene.add(sf.back);
+  sf.mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: tex })); sf.scene.add(sf.mesh);
+  if (!keepView) Object.assign(view, { yaw: 0, pitch: 0, vy: 0, vp: 0, fov: view.full ? 75 : 62, auto: true });
+  $('sfSub').textContent = item.title;
+  $('sfMeta').textContent = [item.date, view.full ? 'full 360°' : '~' + Math.round(coverage) + '° panorama', 'NASA', offline ? 'saved copy' : ''].filter(Boolean).join(' · ');
+  setLoading('', false);
+}
+
+function loadPano(item, bodyName, offline) {
+  const token = ++sfToken;
+  document.querySelectorAll('.sf-thumb').forEach(t => t.classList.toggle('on', t.dataset.id === item.id));
+  setLoading('<span class="spin"></span>Loading panorama&hellip;');
+  const base = '/api/surface/image/' + encodeURIComponent(item.id);
+  const quick = new Image();
+  quick.onload = () => {
+    if (token !== sfToken) return;
+    showPano(quick, item, bodyName, offline, false);
+    $('sfMeta').textContent += ' \u00B7 sharpening\u2026';
+    const full = new Image();                                            // the original is bigger: swap it in when it arrives
+    full.onload = () => { if (token === sfToken) showPano(full, item, bodyName, offline, true); };
+    full.src = base + '?q=full';
+  };
+  quick.onerror = () => {
+    if (token !== sfToken) return;
+    const full = new Image();                                            // no quick version: go straight for the original
+    full.onload = () => { if (token === sfToken) showPano(full, item, bodyName, offline, false); };
+    full.onerror = () => { if (token === sfToken) setLoading('Could not load this panorama. You may be offline and it is not saved yet. Pick another one below.'); };
+    full.src = base + '?q=full';
+  };
+  quick.src = base + '?q=fast';
+}
+
+async function openSurface(bodyName) {
+  window.__surfaceOpen = true; sfEl.classList.add('open'); initSf();
+  const token = ++sfToken;
+  $('sfTitle').textContent = bodyName + ' \u00B7 Surface view'; $('sfSub').textContent = ''; $('sfMeta').textContent = ''; $('sfStrip').innerHTML = '';
+  setLoading('<span class="spin"></span>Searching space-agency archives for panoramas&hellip;');
+  if (!sfRAF) sfFrame();
+  let data;
+  try { data = await (await fetch('/api/surface/search?body=' + encodeURIComponent(bodyName))).json(); }
+  catch (e) { data = { items: [], error: 'The server is not reachable.' }; }
+  if (token !== sfToken) return;
+  if (!data.items || !data.items.length) { setLoading(data.error || 'No panoramas found for ' + bodyName + '.'); return; }
+  const strip = $('sfStrip');
+  data.items.forEach(item => {
+    const b = document.createElement('button'); b.className = 'sf-thumb'; b.dataset.id = item.id; b.title = item.title;
+    if (item.thumb && !data.offline) b.style.backgroundImage = 'url("' + item.thumb + '")';
+    const em = document.createElement('em'); em.textContent = item.title; b.appendChild(em);
+    b.onclick = () => loadPano(item, bodyName, data.offline);
+    strip.appendChild(b);
+  });
+  loadPano(data.items[0], bodyName, data.offline);
+}
+function closeSurface() {
+  sfToken++; sfEl.classList.remove('open'); window.__surfaceOpen = false;
+  if (sfRAF) { cancelAnimationFrame(sfRAF); sfRAF = 0; }
+}
+window.openSurface = openSurface;
+$('sfClose').onclick = closeSurface;
+addEventListener('keydown', e => { if (e.key === 'Escape' && sfEl.classList.contains('open')) closeSurface(); });
+
+</script>
+</body>
+</html>
